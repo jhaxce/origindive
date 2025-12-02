@@ -513,7 +513,8 @@ func main() {
 	// Prepare channels and workers
 	jobs := make(chan uint32, *threads*2)
 	results := make(chan result, *threads*2)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var wg sync.WaitGroup
 
 	// Start workers
