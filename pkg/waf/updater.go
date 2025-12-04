@@ -159,12 +159,22 @@ func (u *Updater) fetchRanges(source *UpdateSource) ([]string, error) {
 func (u *Updater) fetchFromURL(url, format, jsonPath string) ([]string, error) {
 	resp, err := u.httpClient.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP GET failed: %w", err)
+		return nil, fmt.Errorf("failed to fetch from %s: %w (will use cached ranges if available)", url, err)
 	}
 	defer resp.Body.Close()
 
+	// Handle rate limiting
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, fmt.Errorf("API rate limit exceeded for %s (using cached ranges)", url)
+	}
+
+	// Handle service errors
+	if resp.StatusCode >= 500 {
+		return nil, fmt.Errorf("server error %d from %s (using cached ranges)", resp.StatusCode, url)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
+		return nil, fmt.Errorf("HTTP %d from %s (using cached ranges)", resp.StatusCode, url)
 	}
 
 	body, err := io.ReadAll(resp.Body)
