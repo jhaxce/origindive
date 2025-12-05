@@ -174,18 +174,27 @@ func searchWithToken(ctx context.Context, domain, token, orgID string, timeout t
 
 	// Check for HTTP errors
 	if resp.StatusCode != http.StatusOK {
-		// Try to parse error from JSON with nested error structure
+		// Try to parse error from JSON with nested error structure (401 errors)
 		var errorResponse struct {
 			Error struct {
 				Code    int    `json:"code"`
 				Status  string `json:"status"`
 				Reason  string `json:"reason"`
 				Message string `json:"message"`
-				Detail  string `json:"detail"`
 			} `json:"error"`
 		}
 		if json.Unmarshal(body, &errorResponse) == nil && errorResponse.Error.Reason != "" {
 			return nil, fmt.Errorf("Censys API error (HTTP %d): %s", resp.StatusCode, errorResponse.Error.Reason)
+		}
+
+		// Try to parse error with "detail" field (403 errors)
+		var detailResponse struct {
+			Title  string `json:"title"`
+			Status int    `json:"status"`
+			Detail string `json:"detail"`
+		}
+		if json.Unmarshal(body, &detailResponse) == nil && detailResponse.Detail != "" {
+			return nil, fmt.Errorf("Censys API error (HTTP %d): %s", resp.StatusCode, detailResponse.Detail)
 		}
 
 		// Fallback: Try simple error field

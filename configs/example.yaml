@@ -83,9 +83,40 @@ passive_sources:
 #    Then add keys to ~/.config/origindive/config.yaml
 #
 # Only use these if you need scan-specific API keys:
-# shodan_key: "YOUR_SHODAN_API_KEY"
-# censys_id: "YOUR_CENSYS_ID"
-# censys_secret: "YOUR_CENSYS_SECRET"
+# shodan_keys:
+#   - "YOUR_SHODAN_API_KEY"
+# Get API key: https://account.shodan.io/ | Docs: https://developer.shodan.io/api
+#
+# censys_tokens:
+#   - "YOUR_CENSYS_TOKEN"
+# censys_org_id: "YOUR_ORG_ID"
+# Get API token: https://accounts.censys.io/settings/personal-access-tokens | Docs: https://docs.censys.com/reference/get-started
+#
+# securitytrails_keys:
+#   - "YOUR_SECURITYTRAILS_KEY"
+# Get API key: https://securitytrails.com/app/account/credentials | Docs: https://securitytrails.com/app/account/docs-and-examples
+#
+# virustotal_keys:
+#   - "YOUR_VIRUSTOTAL_KEY"
+# Get API key: https://www.virustotal.com/gui/user/[USERNAME]/apikey | Docs: https://docs.virustotal.com/reference/overview
+#
+# zoomeye_keys:
+#   - "YOUR_ZOOMEYE_KEY"
+# Get API key: https://www.zoomeye.ai/profile | Docs: https://www.zoomeye.ai/doc
+#
+# viewdns_keys:
+#   - "YOUR_VIEWDNS_KEY"
+# Get API key: https://viewdns.info/dashboard/api/account-details/ | Docs: https://viewdns.info/api/
+#
+# dnsdumpster_keys:
+#   - "YOUR_DNSDUMPSTER_KEY"
+# Get API key: https://dnsdumpster.com/my-account/ | Docs: https://dnsdumpster.com/developer/
+#
+# webshare_keys:
+#   - "YOUR_WEBSHARE_KEY"
+# webshare_plan_ids:
+#   - "YOUR_PLAN_ID"
+# Get API key: https://dashboard.webshare.io/userapi/keys | Docs: https://apidocs.webshare.io/
 
 # Output configuration
 output_file: "results.txt"
