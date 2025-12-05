@@ -146,7 +146,7 @@ func DefaultGlobalConfig() *GlobalConfig {
 		ConnectTimeout: "3s",
 		Workers:        20,
 		SkipWAF:        true,
-		PassiveSources: []string{"ct", "dns"},
+		PassiveSources: []string{"ct", "dns", "shodan", "censys", "securitytrails", "zoomeye", "wayback", "virustotal", "viewdns", "dnsdumpster"},
 		MinConfidence:  0.7,
 		Format:         "text",
 		APIFailover: APIFailoverConfig{

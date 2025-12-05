@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-origindive
+/origindive
 origindive-*
 
 # Test binary, built with `go test -c`

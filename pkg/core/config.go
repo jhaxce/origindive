@@ -126,7 +126,8 @@ func DefaultConfig() *Config {
 		Workers:        10,
 		Format:         FormatText,
 		MinConfidence:  0.7,
-		PassiveSources: []string{"ct", "dns"},
+		// Use all passive sources by default (filtered by API key availability)
+		PassiveSources: []string{"ct", "dns", "shodan", "censys", "securitytrails", "zoomeye", "wayback", "virustotal", "viewdns", "dnsdumpster"},
 	}
 }
 

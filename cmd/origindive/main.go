@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
@@ -557,15 +558,19 @@ func initializeGlobalConfig() error {
 	fmt.Printf("This will create a global configuration file at:\n")
 	fmt.Printf("%s%s%s\n\n", colors.YELLOW, configPath, colors.NC)
 
+	// Create scanner for input
+	scanner := bufio.NewScanner(os.Stdin)
+
 	// Check if file already exists
 	if _, err := os.Stat(configPath); err == nil {
 		fmt.Printf("%sWarning: Config file already exists!%s\n", colors.YELLOW, colors.NC)
 		fmt.Print("Overwrite? (y/N): ")
-		var response string
-		fmt.Scanln(&response)
-		if strings.ToLower(strings.TrimSpace(response)) != "y" {
-			fmt.Println("Cancelled.")
-			return nil
+		if scanner.Scan() {
+			response := strings.TrimSpace(scanner.Text())
+			if strings.ToLower(response) != "y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
 		}
 		fmt.Println()
 	}
@@ -581,9 +586,10 @@ func initializeGlobalConfig() error {
 	var shodanKeys []string
 	for i := 1; ; i++ {
 		fmt.Printf("  Key #%d: ", i)
-		var key string
-		fmt.Scanln(&key)
-		key = strings.TrimSpace(key)
+		if !scanner.Scan() {
+			break
+		}
+		key := strings.TrimSpace(scanner.Text())
 		if key == "" {
 			break
 		}
@@ -594,32 +600,104 @@ func initializeGlobalConfig() error {
 		fmt.Printf("%s✓ Added %d Shodan key(s)%s\n", colors.GREEN, len(shodanKeys), colors.NC)
 	}
 
-	// Censys credentials
-	fmt.Printf("\n%sCensys API Credentials%s (https://search.censys.io/account/api)\n", colors.CYAN, colors.NC)
-	fmt.Println("Enter credentials one pair at a time (empty ID to finish):")
-	var censysCreds []core.CensysCredential
+	// Censys API tokens
+	fmt.Printf("\n%sCensys API Tokens%s (https://search.censys.io/account/api)\n", colors.CYAN, colors.NC)
+	fmt.Println("Enter API tokens one at a time (empty line to finish):")
+	var censysTokens []string
 	for i := 1; ; i++ {
-		fmt.Printf("  Credential #%d:\n", i)
-		fmt.Print("    API ID: ")
-		var id string
-		fmt.Scanln(&id)
-		id = strings.TrimSpace(id)
-		if id == "" {
+		fmt.Printf("  Token #%d: ", i)
+		if !scanner.Scan() {
 			break
 		}
-		fmt.Print("    Secret: ")
-		var secret string
-		fmt.Scanln(&secret)
-		secret = strings.TrimSpace(secret)
-		if secret == "" {
-			fmt.Println("    Secret cannot be empty, skipping this credential")
-			continue
+		token := strings.TrimSpace(scanner.Text())
+		if token == "" {
+			break
 		}
-		censysCreds = append(censysCreds, core.CensysCredential{ID: id, Secret: secret})
+		censysTokens = append(censysTokens, token)
 	}
-	if len(censysCreds) > 0 {
-		config.CensysCreds = censysCreds
-		fmt.Printf("%s✓ Added %d Censys credential(s)%s\n", colors.GREEN, len(censysCreds), colors.NC)
+	if len(censysTokens) > 0 {
+		config.CensysTokens = censysTokens
+		fmt.Printf("%s✓ Added %d Censys token(s)%s\n", colors.GREEN, len(censysTokens), colors.NC)
+	}
+
+	// SecurityTrails keys
+	fmt.Printf("\n%sSecurityTrails API Keys%s (https://securitytrails.com/app/account/credentials)\n", colors.CYAN, colors.NC)
+	fmt.Println("Enter keys one at a time (empty line to finish):")
+	var securitytrailsKeys []string
+	for i := 1; ; i++ {
+		fmt.Printf("  Key #%d: ", i)
+		if !scanner.Scan() {
+			break
+		}
+		key := strings.TrimSpace(scanner.Text())
+		if key == "" {
+			break
+		}
+		securitytrailsKeys = append(securitytrailsKeys, key)
+	}
+	if len(securitytrailsKeys) > 0 {
+		config.SecurityTrailsKeys = securitytrailsKeys
+		fmt.Printf("%s✓ Added %d SecurityTrails key(s)%s\n", colors.GREEN, len(securitytrailsKeys), colors.NC)
+	}
+
+	// VirusTotal keys
+	fmt.Printf("\n%sVirusTotal API Keys%s (https://www.virustotal.com/gui/user/[username]/apikey)\n", colors.CYAN, colors.NC)
+	fmt.Println("Enter keys one at a time (empty line to finish):")
+	var virustotalKeys []string
+	for i := 1; ; i++ {
+		fmt.Printf("  Key #%d: ", i)
+		if !scanner.Scan() {
+			break
+		}
+		key := strings.TrimSpace(scanner.Text())
+		if key == "" {
+			break
+		}
+		virustotalKeys = append(virustotalKeys, key)
+	}
+	if len(virustotalKeys) > 0 {
+		config.VirusTotalKeys = virustotalKeys
+		fmt.Printf("%s✓ Added %d VirusTotal key(s)%s\n", colors.GREEN, len(virustotalKeys), colors.NC)
+	}
+
+	// ZoomEye keys
+	fmt.Printf("\n%sZoomEye API Keys%s (https://www.zoomeye.org/profile)\n", colors.CYAN, colors.NC)
+	fmt.Println("Enter keys one at a time (empty line to finish):")
+	var zoomeyeKeys []string
+	for i := 1; ; i++ {
+		fmt.Printf("  Key #%d: ", i)
+		if !scanner.Scan() {
+			break
+		}
+		key := strings.TrimSpace(scanner.Text())
+		if key == "" {
+			break
+		}
+		zoomeyeKeys = append(zoomeyeKeys, key)
+	}
+	if len(zoomeyeKeys) > 0 {
+		config.ZoomEyeKeys = zoomeyeKeys
+		fmt.Printf("%s✓ Added %d ZoomEye key(s)%s\n", colors.GREEN, len(zoomeyeKeys), colors.NC)
+	}
+
+	// ViewDNS keys
+	fmt.Printf("\n%sViewDNS API Keys%s (https://viewdns.info/api/)\n", colors.CYAN, colors.NC)
+	fmt.Println("Enter keys one at a time (empty line to finish):")
+	var viewdnsKeys []string
+	for i := 1; ; i++ {
+		fmt.Printf("  Key #%d: ", i)
+		if !scanner.Scan() {
+			break
+		}
+		key := strings.TrimSpace(scanner.Text())
+		if key == "" {
+			break
+		}
+		viewdnsKeys = append(viewdnsKeys, key)
+	}
+	if len(viewdnsKeys) > 0 {
+		config.ViewDNSKeys = viewdnsKeys
+		fmt.Printf("%s✓ Added %d ViewDNS key(s)%s\n", colors.GREEN, len(viewdnsKeys), colors.NC)
 	}
 
 	fmt.Printf("\n%sDefault Settings (press Enter to use defaults shown)%s\n", colors.GREEN, colors.NC)
@@ -627,37 +705,41 @@ func initializeGlobalConfig() error {
 
 	// Workers
 	fmt.Printf("\nWorkers [%d]: ", config.Workers)
-	var workersStr string
-	fmt.Scanln(&workersStr)
-	if workersStr != "" {
-		var workers int
-		if _, err := fmt.Sscanf(workersStr, "%d", &workers); err == nil && workers > 0 {
-			config.Workers = workers
+	if scanner.Scan() {
+		workersStr := strings.TrimSpace(scanner.Text())
+		if workersStr != "" {
+			var workers int
+			if _, err := fmt.Sscanf(workersStr, "%d", &workers); err == nil && workers > 0 {
+				config.Workers = workers
+			}
 		}
 	}
 
 	// Timeout
 	fmt.Printf("Timeout [%s]: ", config.Timeout)
-	var timeoutStr string
-	fmt.Scanln(&timeoutStr)
-	if timeoutStr != "" {
-		config.Timeout = timeoutStr
+	if scanner.Scan() {
+		timeoutStr := strings.TrimSpace(scanner.Text())
+		if timeoutStr != "" {
+			config.Timeout = timeoutStr
+		}
 	}
 
 	// Format
 	fmt.Printf("Default format (text/json/csv) [%s]: ", config.Format)
-	var formatStr string
-	fmt.Scanln(&formatStr)
-	if formatStr != "" {
-		config.Format = formatStr
+	if scanner.Scan() {
+		formatStr := strings.TrimSpace(scanner.Text())
+		if formatStr != "" {
+			config.Format = formatStr
+		}
 	}
 
 	// Skip WAF
 	fmt.Printf("Skip WAF/CDN ranges by default? (y/N) [%v]: ", config.SkipWAF)
-	var skipStr string
-	fmt.Scanln(&skipStr)
-	if skipStr != "" {
-		config.SkipWAF = strings.ToLower(strings.TrimSpace(skipStr)) == "y"
+	if scanner.Scan() {
+		skipStr := strings.TrimSpace(scanner.Text())
+		if skipStr != "" {
+			config.SkipWAF = strings.ToLower(skipStr) == "y"
+		}
 	}
 
 	// Save config
@@ -1145,7 +1227,7 @@ func autoInitializeGlobalConfig() {
 		minimalConfig := createMinimalGlobalConfig()
 		if err := os.WriteFile(configPath, []byte(minimalConfig), 0600); err == nil {
 			fmt.Printf("%s[+] Created global config: %s%s\n", colors.GREEN, configPath, colors.NC)
-			fmt.Printf("%s[*] Edit this file to add API keys (Shodan, Censys)%s\n\n", colors.CYAN, colors.NC)
+			fmt.Printf("%s[*] Edit this file to add API keys for passive reconnaissance%s\n\n", colors.CYAN, colors.NC)
 		}
 		return
 	}
@@ -1158,7 +1240,7 @@ func autoInitializeGlobalConfig() {
 
 	if err := os.WriteFile(configPath, exampleData, 0600); err == nil {
 		fmt.Printf("%s[+] Created global config: %s%s\n", colors.GREEN, configPath, colors.NC)
-		fmt.Printf("%s[*] Edit this file to add API keys (Shodan, Censys)%s\n\n", colors.CYAN, colors.NC)
+		fmt.Printf("%s[*] Edit this file to add API keys for passive reconnaissance%s\n\n", colors.CYAN, colors.NC)
 	}
 }
 
@@ -1241,10 +1323,25 @@ func createMinimalGlobalConfig() string {
 shodan_keys:
   # - "YOUR_SHODAN_KEY_HERE"
 
-# Censys API credentials (https://search.censys.io/account/api)
-censys_creds:
-  # - id: "YOUR_CENSYS_ID_HERE"
-  #   secret: "YOUR_CENSYS_SECRET_HERE"
+# Censys API tokens (https://search.censys.io/account/api)
+censys_tokens:
+  # - "YOUR_CENSYS_API_TOKEN_HERE"
+
+# SecurityTrails API keys (https://securitytrails.com/app/account/credentials)
+securitytrails_keys:
+  # - "YOUR_SECURITYTRAILS_KEY_HERE"
+
+# VirusTotal API keys (https://www.virustotal.com/gui/user/[username]/apikey)
+virustotal_keys:
+  # - "YOUR_VIRUSTOTAL_KEY_HERE"
+
+# ZoomEye API keys (https://www.zoomeye.org/profile)
+zoomeye_keys:
+  # - "YOUR_ZOOMEYE_KEY_HERE"
+
+# ViewDNS API keys (https://viewdns.info/api/)
+viewdns_keys:
+  # - "YOUR_VIEWDNS_KEY_HERE"
 
 # ============================================================
 # Global Defaults
