@@ -7,18 +7,19 @@
 *.dll
 *.so
 *.dylib
+origindive
+origindive-*
 
 # Test binary, built with `go test -c`
 *.test
 
 # Code coverage profiles and other test artifacts
 *.out
-coverage
 coverage.*
 *.coverprofile
 profile.cov
-c
-**/c
+*_coverage_test.go
+*_integration_test.go
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -27,8 +28,17 @@ c
 go.work
 go.work.sum
 
+# Build artifacts
+dist/
+*.zip
+*.tar.gz
+*.deb
+*.rpm
+
 # env file
 .env
+.env.local
+.env.*.local
 
 # Editor/IDE
 # .idea/
