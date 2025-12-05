@@ -110,8 +110,12 @@ func extractSubdomain(urlStr, baseDomain string) string {
 	// Remove port if present
 	hostname = strings.Split(hostname, ":")[0]
 
-	// Check if it ends with our base domain
-	if !strings.HasSuffix(hostname, baseDomain) {
+	// Normalize both to lowercase for comparison
+	hostnameLower := strings.ToLower(hostname)
+	baseDomainLower := strings.ToLower(baseDomain)
+
+	// Check if it ends with our base domain (case-insensitive)
+	if !strings.HasSuffix(hostnameLower, baseDomainLower) {
 		return ""
 	}
 
@@ -120,7 +124,7 @@ func extractSubdomain(urlStr, baseDomain string) string {
 		return ""
 	}
 
-	return strings.ToLower(hostname)
+	return hostnameLower
 }
 
 // resolveSubdomainsToIPs resolves a list of subdomains to IPv4 addresses

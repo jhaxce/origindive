@@ -141,8 +141,16 @@ func TestExtractSubdomain_InvalidURL(t *testing.T) {
 
 func TestExtractSubdomain_CaseInsensitive(t *testing.T) {
 	got := extractSubdomain("http://WWW.EXAMPLE.COM/", "example.com")
-	if got != "www.example.com" {
-		t.Errorf("extractSubdomain should lowercase, got: %s", got)
+	want := "www.example.com"
+	if got != want {
+		t.Errorf("extractSubdomain() = %q, want %q", got, want)
+	}
+
+	// Also test with uppercase base domain
+	got2 := extractSubdomain("http://api.example.com/", "EXAMPLE.COM")
+	want2 := "api.example.com"
+	if got2 != want2 {
+		t.Errorf("extractSubdomain() = %q, want %q", got2, want2)
 	}
 }
 

@@ -12,10 +12,16 @@ import (
 type Source string
 
 const (
-	SourceShodan Source = "shodan"
-	SourceCensys Source = "censys"
-	SourceCT     Source = "ct"
-	SourceDNS    Source = "dns"
+	SourceShodan         Source = "shodan"
+	SourceCensys         Source = "censys"
+	SourceSecurityTrails Source = "securitytrails"
+	SourceVirusTotal     Source = "virustotal"
+	SourceZoomEye        Source = "zoomeye"
+	SourceCT             Source = "ct"
+	SourceViewDNS        Source = "viewdns"
+	SourceDNSDumpster    Source = "dnsdumpster"
+	SourceWayback        Source = "wayback"
+	SourceDNS            Source = "dns"
 )
 
 // Status represents the current status of an API

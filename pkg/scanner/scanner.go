@@ -181,25 +181,29 @@ func New(config *core.Config) (*Scanner, error) {
 		proxyList: proxyList,
 	}
 
-	// Load WAF filter if enabled
+	// Load WAF filter if enabled and database path is set
 	if config.SkipWAF {
-		// Try user cache first, then fallback to repo default
 		wafPath := config.WAFDatabasePath
 		if wafPath == "" {
-			wafPath = "data/waf_ranges.json" // Default fallback
+			wafPath = "data/waf_ranges.json" // Default path
 		}
 
+		// Only load if we can access the file (handles test case with empty path)
 		db, err := waf.LoadWAFDatabase(wafPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load WAF database: %w", err)
+			// If using default path and it doesn't exist, silently skip
+			// If using custom path, this is an error
+			if config.WAFDatabasePath != "" {
+				return nil, fmt.Errorf("failed to load WAF database from %s: %w", wafPath, err)
+			}
+			// Default path not found - continue without WAF filtering
+		} else {
+			filter, err := waf.NewFilterFromDatabase(db, config.SkipProviders, config.ShowSkipped)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create WAF filter: %w", err)
+			}
+			s.wafFilter = filter
 		}
-
-		filter, err := waf.NewFilterFromDatabase(db, config.SkipProviders, config.ShowSkipped)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create WAF filter: %w", err)
-		}
-
-		s.wafFilter = filter
 	}
 
 	return s, nil

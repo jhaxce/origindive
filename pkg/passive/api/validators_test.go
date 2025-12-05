@@ -150,7 +150,7 @@ func TestDNSValidator(t *testing.T) {
 }
 
 func TestGetValidator_Shodan(t *testing.T) {
-	validator := GetValidator(SourceShodan, "test_key", "", "")
+	validator := GetValidator(SourceShodan, "test_key", "", "", "", "", "")
 	if validator == nil {
 		t.Fatal("GetValidator returned nil for Shodan")
 	}
@@ -163,7 +163,7 @@ func TestGetValidator_Shodan(t *testing.T) {
 }
 
 func TestGetValidator_Censys(t *testing.T) {
-	validator := GetValidator(SourceCensys, "", "id", "secret")
+	validator := GetValidator(SourceCensys, "", "id", "secret", "", "", "")
 	if validator == nil {
 		t.Fatal("GetValidator returned nil for Censys")
 	}
@@ -176,7 +176,7 @@ func TestGetValidator_Censys(t *testing.T) {
 }
 
 func TestGetValidator_CT(t *testing.T) {
-	validator := GetValidator(SourceCT, "", "", "")
+	validator := GetValidator(SourceCT, "", "", "", "", "", "")
 	if validator == nil {
 		t.Fatal("GetValidator returned nil for CT")
 	}
@@ -192,7 +192,7 @@ func TestGetValidator_CT(t *testing.T) {
 }
 
 func TestGetValidator_DNS(t *testing.T) {
-	validator := GetValidator(SourceDNS, "", "", "")
+	validator := GetValidator(SourceDNS, "", "", "", "", "", "")
 	if validator == nil {
 		t.Fatal("GetValidator returned nil for DNS")
 	}
@@ -205,7 +205,7 @@ func TestGetValidator_DNS(t *testing.T) {
 }
 
 func TestGetValidator_Unknown(t *testing.T) {
-	validator := GetValidator("unknown_source", "", "", "")
+	validator := GetValidator("unknown_source", "", "", "", "", "", "")
 	if validator == nil {
 		t.Fatal("GetValidator returned nil for unknown source")
 	}
@@ -345,7 +345,7 @@ func TestGetValidator_AllSources(t *testing.T) {
 
 	for _, source := range sources {
 		t.Run(string(source), func(t *testing.T) {
-			validator := GetValidator(source, "key", "id", "secret")
+			validator := GetValidator(source, "key", "id", "secret", "stkey", "vtkey", "zekey")
 			if validator == nil {
 				t.Fatalf("GetValidator returned nil for %s", source)
 			}
