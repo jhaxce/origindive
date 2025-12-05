@@ -12,7 +12,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org/)
-[![Release](https://img.shields.io/github/v/release/jhaxce/origindive?label=v3.2.0)](https://github.com/jhaxce/origindive/releases)
+[![Release](https://img.shields.io/github/v/release/jhaxce/origindive)](https://github.com/jhaxce/origindive/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jhaxce/origindive)](https://goreportcard.com/report/github.com/jhaxce/origindive)
 [![codecov](https://codecov.io/gh/jhaxce/origindive/branch/main/graph/badge.svg)](https://codecov.io/gh/jhaxce/origindive)
 [![Go Reference](https://pkg.go.dev/badge/github.com/jhaxce/origindive.svg)](https://pkg.go.dev/github.com/jhaxce/origindive)
