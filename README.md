@@ -1,9 +1,9 @@
 <div align="center">
 <h1>origindive</h1>
 
-<source media="(prefers-color-scheme: dark)" srcset="images/origin_dark.png">
-<source media="(prefers-color-scheme: light)" srcset="images/origin_light.png">
-<img alt="origin ascii title" src="images/origin_dark.png">
+<source media="(prefers-color-scheme: dark)" srcset="images/origindive_dark.png">
+<source media="(prefers-color-scheme: light)" srcset="images/origindive_light.png">
+<img alt="origindive ascii title" src="images/origindive_dark.png">
 
 **Dive deep to discover origin servers** - A powerful security analysis tool for discovering real origin server IPs hidden behind CDN/WAF services through both passive reconnaissance and active scanning.
 
