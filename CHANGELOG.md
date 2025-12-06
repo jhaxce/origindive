@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `--input-scrape` flag: Scrape IPv4 addresses from an arbitrary file and write `<domain>-ips.txt`, then use it as the `--input` file for the same run.
+
+### Removed
+- `--ic` / `--is` legacy Censys-specific input flag: replaced by the generic `--input-scrape` behavior.
+
+### Changed
+- Documentation: `README.md` updated to document `--input-scrape` and related usage examples.
+
 ## [3.2.1] - 2025-12-06
 
 ### Fixed

@@ -242,43 +242,15 @@ func (f *Formatter) formatTextSummary(summary core.ScanSummary) string {
 	sb.WriteString(fmt.Sprintf("%s[+] 200 OK:%s %s%d%s\n", f.green, f.nc, f.green, summary.SuccessCount, f.nc))
 
 	// Possible origin hosts discovered during verification
-	if summary.PossibleOriginCount > 0 {
-		sb.WriteString(fmt.Sprintf("%s[?]%s Possible origin(s): %s%d%s", f.bold, f.nc, f.green, summary.PossibleOriginCount, f.nc))
-
-		// Related origins (likely match the supplied domain)
-		if len(summary.PossibleOriginRelatedIPs) > 0 {
-			sb.WriteString(" (related: ")
-			for i, ip := range summary.PossibleOriginRelatedIPs {
-				if i > 0 {
-					sb.WriteString(", ")
-				}
-				sb.WriteString(f.green + ip + f.nc)
+	// Only display related possible-origin IPs (omit "related:" label and any "other" IPs)
+	if len(summary.PossibleOriginRelatedIPs) > 0 {
+		sb.WriteString(fmt.Sprintf("%s[?]%s Possible origin(s): ", f.bold, f.nc))
+		for i, ip := range summary.PossibleOriginRelatedIPs {
+			if i > 0 {
+				sb.WriteString(", ")
 			}
-			sb.WriteString(")")
+			sb.WriteString(f.green + ip + f.nc)
 		}
-
-		// Other origins (not related to the supplied domain) - highlight in yellow
-		// These are shown after related ones for clarity
-		otherStart := len(summary.PossibleOriginRelatedIPs)
-		if len(summary.PossibleOriginIPs) > otherStart {
-			// Determine other ips slice
-			otherIPs := summary.PossibleOriginIPs[otherStart:]
-			if len(otherIPs) > 0 {
-				if len(summary.PossibleOriginRelatedIPs) == 0 {
-					sb.WriteString(" (other: ")
-				} else {
-					sb.WriteString(" (other: ")
-				}
-				for i, ip := range otherIPs {
-					if i > 0 {
-						sb.WriteString(", ")
-					}
-					sb.WriteString(f.yellow + ip + f.nc)
-				}
-				sb.WriteString(")")
-			}
-		}
-
 		sb.WriteString("\n")
 	}
 

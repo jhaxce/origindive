@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -383,6 +384,9 @@ func parseFlags() (*core.Config, bool) {
 	pflag.StringVarP(&config.EndIP, "end-ip", "e", "", "End IP address")
 	pflag.StringVarP(&config.CIDR, "cidr", "c", "", "CIDR notation (e.g., 192.168.1.0/24)")
 	pflag.StringVarP(&config.InputFile, "input", "i", "", "Input file with IPs/CIDRs")
+	// Input scrape flag: generic scrape
+	var inputScrape string
+	pflag.StringVar(&inputScrape, "input-scrape", "", "Scrape IPs from file and use as input (writes <domain>-ips.txt and uses it)")
 	pflag.StringVar(&config.ASN, "asn", "", "ASN lookup, comma-separated (e.g., AS4775,AS9299 or 4775,9299)")
 	pflag.StringVarP(&config.ExpandNetmask, "expand-netmask", "n", "", "Expand IPs to subnet (e.g., /24 or 24) [works with passive mode and -i input file]")
 
@@ -549,6 +553,21 @@ func parseFlags() (*core.Config, bool) {
 	// Parse passive sources
 	if passiveSources != "" {
 		config.PassiveSources = strings.Split(passiveSources, ",")
+	}
+
+	// Handle input scrape flag (--input-scrape)
+	if inputScrape != "" {
+		if config.Domain == "" {
+			fmt.Fprintf(os.Stderr, "%sError: domain required when using --input-scrape%s\n", colors.RED, colors.NC)
+			os.Exit(1)
+		}
+
+		outFile, err := scrapeIPsFromFile(inputScrape, config.Domain)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%sError processing input file: %s%s\n", colors.RED, err, colors.NC)
+			os.Exit(1)
+		}
+		config.InputFile = outFile
 	}
 
 	// Validate -n flag: should be just a mask, not a full CIDR
@@ -1020,6 +1039,46 @@ func parseIPRanges(config *core.Config) error {
 	config.IPRanges = ranges
 	return nil
 }
+
+// scrapeIPsFromFile reads any file, extracts IPv4 addresses using a regex,
+// writes them to '<domain>-ips.txt' (one per line) and returns the filename.
+func scrapeIPsFromFile(path, domain string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file %s: %w", path, err)
+	}
+
+	re := regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
+	matches := re.FindAllString(string(data), -1)
+
+	seen := make(map[string]bool)
+	var ips []string
+	for _, m := range matches {
+		ipObj := net.ParseIP(m)
+		if ipObj == nil || ipObj.To4() == nil {
+			continue
+		}
+		if seen[m] {
+			continue
+		}
+		seen[m] = true
+		ips = append(ips, m)
+	}
+
+	if len(ips) == 0 {
+		return "", fmt.Errorf("no IPs found in %s", path)
+	}
+
+	sort.Strings(ips)
+	outName := fmt.Sprintf("%s-ips.txt", domain)
+	if err := os.WriteFile(outName, []byte(strings.Join(ips, "\n")), 0644); err != nil {
+		return "", fmt.Errorf("failed to write output file: %w", err)
+	}
+
+	return outName, nil
+}
+
+// (Previously had a Censys-specific parser; removed in favor of generic scrape.)
 
 // runPassiveRecon performs passive reconnaissance to discover IPs related to the domain
 func runPassiveRecon(config *core.Config) ([]string, error) {

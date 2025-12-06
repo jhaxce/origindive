@@ -1,4 +1,5 @@
-# origindive
+<div align="center">
+<h1>origindive</h1>
 
 ```
            _      _         ___         
@@ -17,6 +18,7 @@
 [![codecov](https://codecov.io/gh/jhaxce/origindive/branch/main/graph/badge.svg)](https://codecov.io/gh/jhaxce/origindive)
 [![Go Reference](https://pkg.go.dev/badge/github.com/jhaxce/origindive.svg)](https://pkg.go.dev/github.com/jhaxce/origindive)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fjhaxce%2Forigindive.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fjhaxce%2Forigindive?ref=badge_shield)
+</div>
 
 ## 📋 Table of Contents
 
@@ -248,6 +250,12 @@ origindive -d example.com -n 23.0.0.0/16 --skip-waf -j 20
 # Scan IPs from a file
 origindive -d example.com -i ips.txt --skip-waf
 
+# Scrape a file for IPs and use them as input
+```bash
+# Scrape `eulap-ips.json` for IPv4 addresses, write `example.com-ips.txt`, then scan
+origindive -d example.com --input-scrape eulap-ips.json
+```
+
 # Use random browser user agent
 origindive -d example.com -n 192.168.1.0/24 -A random
 
@@ -466,6 +474,7 @@ IP Range (choose one):
   -n, --expand-netmask str  CIDR (e.g., 192.168.1.0/24) OR mask for passive (/24)
   -c, --cidr string         CIDR notation (e.g., 192.168.0.0/24)
   -i, --input string        Input file with IPs/CIDRs/ranges
+  --input-scrape string    Scrape IPs from a file (writes `<domain>-ips.txt` and uses it as input)
   --asn string              ASN lookup, comma-separated (e.g., AS4775,AS9299)
   
 Configuration:
