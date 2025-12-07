@@ -147,6 +147,11 @@ passive_sources:
   - dns       # DNS history (free, no key needed)
   - shodan    # Shodan (requires API key)
   - censys    # Censys (requires API credentials)
+  - securitytrails  # SecurityTrails (requires API key)
+  - virustotal     # VirusTotal (requires API key)
+  - zoomeye        # ZoomEye (requires API key)
+  - viewdns        # ViewDNS (requires API key)
+  - dnsdumpster    # DNSDumpster (requires API key
 min_confidence: 0.7  # Minimum confidence score (0.0-1.0)
 
 # Output
@@ -196,4 +201,3 @@ api_failover:
 #    - Second key hits rate limit → switch to third key
 #    - Third key hits rate limit → skip Shodan, use other sources
 #    - After cooldown period → retry with first key
-#

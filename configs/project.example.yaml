@@ -12,7 +12,7 @@
 #   1. Create global config once: origindive --init-config
 #      → Stores API keys in ~/.config/origindive/config.yaml
 #   2. Create scan configs for each target (this file)
-#      → Save as: target-name.yaml (e.g., nbi.yaml, example.yaml)
+#      → Save as: target-name.yaml (e.g., test.yaml, example.yaml)
 #   3. Run: origindive --config target-name.yaml
 #      → Tool loads global config + scan config (scan overrides global)
 #

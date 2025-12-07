@@ -247,7 +247,7 @@ origindive -d example.com -n 23.0.0.0/16 --skip-waf -j 20
 origindive -d example.com -i ips.txt --skip-waf
 
 # Scrape a file for IPs and use them as input
-origindive -d example.com --input-scrape eulap-ips.json
+origindive -d example.com --input-scrape example.com-ips.json
 
 # Use random browser user agent
 origindive -d example.com -n 192.168.1.0/24 -A random
