@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/jhaxce/origindive/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/core"
 )
 
 // ParseIP parses an IP address string

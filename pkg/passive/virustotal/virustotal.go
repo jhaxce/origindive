@@ -85,9 +85,12 @@ func SearchSubdomains(ctx context.Context, domain string, apiKeys []string, time
 	return []string{}, fmt.Errorf("no valid API keys found")
 }
 
+// apiBaseURL is the VirusTotal API endpoint (can be overridden in tests)
+var apiBaseURL = "https://www.virustotal.com/api/v3/domains/"
+
 // searchWithKey performs the search with a single API key
 func searchWithKey(ctx context.Context, domain, apiKey string, timeout time.Duration) ([]string, error) {
-	url := fmt.Sprintf("https://www.virustotal.com/api/v3/domains/%s/subdomains?limit=40", domain)
+	url := fmt.Sprintf("%s%s/subdomains?limit=40", apiBaseURL, domain)
 
 	client := &http.Client{
 		Timeout: timeout,

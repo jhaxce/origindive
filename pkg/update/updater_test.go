@@ -1,6 +1,9 @@
 package update
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -13,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jhaxce/origindive/internal/version"
+	"github.com/jhaxce/origindive/v3/internal/version"
 )
 
 func TestCheckForUpdate_NoUpdate(t *testing.T) {
@@ -469,5 +472,192 @@ func TestFilePermissions(t *testing.T) {
 		if mode&0111 == 0 {
 			t.Error("File should be executable")
 		}
+	}
+}
+
+// ============================================================================
+// ExtractBinary, VerifyChecksum, copyFile - Coverage Tests
+// ============================================================================
+
+func TestExtractBinary_UnsupportedFormat(t *testing.T) {
+	// Create temp file with unsupported extension
+	tmpFile, err := os.CreateTemp("", "test-*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	_, err = ExtractBinary(tmpFile.Name())
+	if err == nil {
+		t.Error("Expected error for unsupported format")
+	}
+}
+
+func TestExtractBinary_ZipNoBinary(t *testing.T) {
+	// Create a zip without origindive binary
+	tmpZip, err := os.CreateTemp("", "test-*.zip")
+	if err != nil {
+		t.Fatalf("Failed to create temp zip: %v", err)
+	}
+	zipPath := tmpZip.Name()
+	defer os.Remove(zipPath)
+
+	w := zip.NewWriter(tmpZip)
+	f, _ := w.Create("README.md")
+	f.Write([]byte("readme content"))
+	w.Close()
+	tmpZip.Close()
+
+	_, err = ExtractBinary(zipPath)
+	if err == nil {
+		t.Error("Expected error when binary not found in archive")
+	}
+}
+
+func TestExtractBinary_ZipInvalid(t *testing.T) {
+	// Create an invalid zip file
+	tmpFile, err := os.CreateTemp("", "test-*.zip")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFile.Write([]byte("not a zip"))
+	tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	_, err = ExtractBinary(tmpFile.Name())
+	if err == nil {
+		t.Error("Expected error for invalid zip")
+	}
+}
+
+func TestExtractBinary_TarGzNoBinary(t *testing.T) {
+	// Create tar.gz without origindive
+	tmpFile, err := os.CreateTemp("", "test-*.tar.gz")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tarPath := tmpFile.Name()
+	defer os.Remove(tarPath)
+
+	gw := gzip.NewWriter(tmpFile)
+	tw := tar.NewWriter(gw)
+	content := []byte("readme content")
+	tw.WriteHeader(&tar.Header{
+		Name: "README.md",
+		Mode: 0644,
+		Size: int64(len(content)),
+	})
+	tw.Write(content)
+	tw.Close()
+	gw.Close()
+	tmpFile.Close()
+
+	_, err = ExtractBinary(tarPath)
+	if err == nil {
+		t.Error("Expected error when binary not found in tar.gz")
+	}
+}
+
+func TestExtractBinary_TarGzInvalid(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-*.tar.gz")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFile.Write([]byte("not a tar.gz"))
+	tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	_, err = ExtractBinary(tmpFile.Name())
+	if err == nil {
+		t.Error("Expected error for invalid tar.gz")
+	}
+}
+
+func TestVerifyChecksum_Valid(t *testing.T) {
+	// Create a temp file
+	tmpFile, err := os.CreateTemp("", "test-checksum-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	content := []byte("test content for checksum")
+	tmpFile.Write(content)
+	tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	// Calculate expected checksum
+	hash := sha256.Sum256(content)
+	expected := hex.EncodeToString(hash[:])
+
+	err = VerifyChecksum(tmpFile.Name(), expected)
+	if err != nil {
+		t.Errorf("VerifyChecksum failed for valid checksum: %v", err)
+	}
+}
+
+func TestVerifyChecksum_Invalid(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-checksum-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tmpFile.Write([]byte("test content"))
+	tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
+
+	err = VerifyChecksum(tmpFile.Name(), "invalidchecksum")
+	if err == nil {
+		t.Error("Expected error for invalid checksum")
+	}
+}
+
+func TestVerifyChecksum_FileNotFound(t *testing.T) {
+	err := VerifyChecksum("/nonexistent/path/file.txt", "abc123")
+	if err == nil {
+		t.Error("Expected error for nonexistent file")
+	}
+}
+
+func TestCopyFile_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcFile := filepath.Join(tmpDir, "source.txt")
+	dstFile := filepath.Join(tmpDir, "dest.txt")
+
+	content := []byte("source file content")
+	err := os.WriteFile(srcFile, content, 0644)
+	if err != nil {
+		t.Fatalf("Failed to create source file: %v", err)
+	}
+
+	err = copyFile(srcFile, dstFile)
+	if err != nil {
+		t.Errorf("copyFile failed: %v", err)
+	}
+
+	// Verify content
+	dstContent, err := os.ReadFile(dstFile)
+	if err != nil {
+		t.Errorf("Failed to read destination file: %v", err)
+	}
+	if string(dstContent) != string(content) {
+		t.Error("Destination content doesn't match source")
+	}
+}
+
+func TestCopyFile_SourceNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	err := copyFile("/nonexistent/source.txt", filepath.Join(tmpDir, "dest.txt"))
+	if err == nil {
+		t.Error("Expected error for nonexistent source file")
+	}
+}
+
+func TestCopyFile_InvalidDestination(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcFile := filepath.Join(tmpDir, "source.txt")
+	os.WriteFile(srcFile, []byte("content"), 0644)
+
+	err := copyFile(srcFile, "/nonexistent/directory/file.txt")
+	if err == nil {
+		t.Error("Expected error for invalid destination path")
 	}
 }

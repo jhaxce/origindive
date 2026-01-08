@@ -18,13 +18,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jhaxce/origindive/internal/colors"
-	"github.com/jhaxce/origindive/internal/version"
-	"github.com/jhaxce/origindive/pkg/core"
-	"github.com/jhaxce/origindive/pkg/ip"
-	"github.com/jhaxce/origindive/pkg/output"
-	"github.com/jhaxce/origindive/pkg/proxy"
-	"github.com/jhaxce/origindive/pkg/waf"
+	"github.com/jhaxce/origindive/v3/internal/colors"
+	"github.com/jhaxce/origindive/v3/internal/version"
+	"github.com/jhaxce/origindive/v3/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/ip"
+	"github.com/jhaxce/origindive/v3/pkg/output"
+	"github.com/jhaxce/origindive/v3/pkg/proxy"
+	"github.com/jhaxce/origindive/v3/pkg/waf"
 )
 
 // Scanner performs HTTP-based origin IP discovery
@@ -304,7 +304,7 @@ func (s *Scanner) Scan(ctx context.Context) (*core.ScanResult, error) {
 		if !s.config.NoColor {
 			fmt.Println(colors.YELLOW + "[*] Verifying redirect behavior" + colors.NC + "\n")
 		} else {
-			fmt.Println("[*] Verifying redirect behavior\n")
+			fmt.Print("[*] Verifying redirect behavior\n\n")
 		}
 		falsePositiveIPs := s.validateSuccessfulIPs(ctx, result.Success)
 		// Additionally perform PTR reverse lookup checks

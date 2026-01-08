@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -85,19 +86,73 @@ func TestSearchDomain_RateLimitRotation(t *testing.T) {
 	}
 }
 
-func TestSearchWithKey_HTTPError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(DNSDumpsterResponse{
-			Error: "Invalid API key",
-		})
-	}))
-	defer server.Close()
+func TestSearchWithKey_StatusCodes(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		responseBody   interface{}
+		wantErrContain string
+	}{
+		{
+			name:           "401 Unauthorized",
+			statusCode:     http.StatusUnauthorized,
+			responseBody:   DNSDumpsterResponse{Error: "Invalid API key"},
+			wantErrContain: "Invalid API key",
+		},
+		{
+			name:           "429 Rate Limit",
+			statusCode:     http.StatusTooManyRequests,
+			responseBody:   DNSDumpsterResponse{Error: "Rate limit exceeded"},
+			wantErrContain: "Rate limit exceeded",
+		},
+		{
+			name:           "500 Server Error",
+			statusCode:     http.StatusInternalServerError,
+			responseBody:   DNSDumpsterResponse{Error: "Internal server error"},
+			wantErrContain: "Internal server error",
+		},
+		{
+			name:           "Non-JSON error response",
+			statusCode:     http.StatusBadRequest,
+			responseBody:   "plain text error message that should be returned",
+			wantErrContain: "status 400",
+		},
+	}
 
-	ctx := context.Background()
-	_, err := searchWithKey(ctx, "example.com", "invalid_key", 1*time.Second)
-	if err == nil {
-		t.Log("Expected error for invalid key")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Verify API key header
+				if r.Header.Get("X-API-Key") != "test_key" {
+					t.Errorf("Expected X-API-Key='test_key', got '%s'", r.Header.Get("X-API-Key"))
+				}
+
+				w.WriteHeader(tt.statusCode)
+				w.Header().Set("Content-Type", "application/json")
+
+				switch v := tt.responseBody.(type) {
+				case DNSDumpsterResponse:
+					json.NewEncoder(w).Encode(v)
+				case string:
+					w.Write([]byte(v))
+				}
+			}))
+			defer server.Close()
+
+			// Override API URL for testing
+			oldURL := apiBaseURL
+			apiBaseURL = server.URL + "/"
+			defer func() { apiBaseURL = oldURL }()
+
+			ctx := context.Background()
+			_, err := searchWithKey(ctx, "example.com", "test_key", 1*time.Second)
+
+			if err == nil {
+				t.Errorf("Expected error for status %d", tt.statusCode)
+			} else if !strings.Contains(err.Error(), tt.wantErrContain) {
+				t.Errorf("Error should contain '%s', got: %v", tt.wantErrContain, err)
+			}
+		})
 	}
 }
 
@@ -108,26 +163,225 @@ func TestSearchWithKey_InvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx := context.Background()
 	_, err := searchWithKey(ctx, "example.com", "test_key", 1*time.Second)
+
 	if err == nil {
-		t.Log("Expected JSON parsing error")
+		t.Error("Expected JSON parsing error")
+	} else if !strings.Contains(err.Error(), "failed to parse") {
+		t.Errorf("Expected parse error, got: %v", err)
 	}
 }
 
-func TestSearchWithKey_APIError(t *testing.T) {
+func TestSearchWithKey_APIErrorIn200Response(t *testing.T) {
+	// Test case where API returns 200 OK but includes error in JSON
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(DNSDumpsterResponse{
-			Error: "Domain not found",
+			Error: "Domain not found in database",
 		})
 	}))
 	defer server.Close()
 
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx := context.Background()
 	_, err := searchWithKey(ctx, "example.com", "test_key", 1*time.Second)
+
 	if err == nil {
-		t.Log("Expected API error")
+		t.Error("Expected API error")
+	} else if !strings.Contains(err.Error(), "Domain not found") {
+		t.Errorf("Expected domain error, got: %v", err)
+	}
+}
+
+func TestSearchWithKey_AllRecordTypes(t *testing.T) {
+	// Test extraction from A, MX, and NS records
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := DNSDumpsterResponse{
+			A: []DNSRecord{
+				{
+					Host: "www.example.com",
+					IPs: []IPDetail{
+						{IP: "192.168.1.1"},
+						{IP: "192.168.1.2"},
+						{IP: "  192.168.1.3  "}, // With whitespace
+					},
+				},
+			},
+			MX: []DNSRecord{
+				{
+					Host: "mail.example.com",
+					IPs: []IPDetail{
+						{IP: "192.168.2.1"},
+						{IP: "192.168.1.1"}, // Duplicate (should dedupe)
+					},
+				},
+			},
+			NS: []DNSRecord{
+				{
+					Host: "ns1.example.com",
+					IPs: []IPDetail{
+						{IP: "192.168.3.1"},
+						{IP: "invalid-ip"},  // Invalid (should be filtered)
+						{IP: "2001:db8::1"}, // IPv6 (should be filtered - IPv4 only)
+					},
+				},
+			},
+			TotalA: 3,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx := context.Background()
+	ips, err := searchWithKey(ctx, "example.com", "test_key", 1*time.Second)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Expected: 192.168.1.1, 192.168.1.2, 192.168.1.3, 192.168.2.1, 192.168.3.1 (5 unique IPs)
+	if len(ips) != 5 {
+		t.Errorf("Expected 5 unique IPs, got %d: %v", len(ips), ips)
+	}
+
+	// Check specific IPs are present
+	ipMap := make(map[string]bool)
+	for _, ip := range ips {
+		ipMap[ip] = true
+	}
+
+	expectedIPs := []string{"192.168.1.1", "192.168.1.2", "192.168.1.3", "192.168.2.1", "192.168.3.1"}
+	for _, expectedIP := range expectedIPs {
+		if !ipMap[expectedIP] {
+			t.Errorf("Expected IP %s not found in results", expectedIP)
+		}
+	}
+}
+
+func TestSearchWithKey_ContextCancellation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Sleep to allow context cancellation
+		time.Sleep(100 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(DNSDumpsterResponse{})
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	_, err := searchWithKey(ctx, "example.com", "test_key", 5*time.Second)
+
+	if err == nil {
+		t.Error("Expected context cancellation error")
+	} else if !strings.Contains(err.Error(), "context canceled") && !strings.Contains(err.Error(), "request failed") {
+		t.Logf("Got error (may not be cancellation): %v", err)
+	}
+}
+
+func TestSearchWithKey_Timeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Sleep longer than timeout
+		time.Sleep(200 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx := context.Background()
+
+	// Very short timeout to force failure
+	_, err := searchWithKey(ctx, "example.com", "test_key", 1*time.Millisecond)
+
+	if err == nil {
+		t.Error("Expected timeout error")
+	}
+}
+
+func TestSearchWithKey_LongBodyTruncation(t *testing.T) {
+	// Test the body truncation logic for error messages (200 char limit)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		// Write a 300-byte error response (should be truncated to 200 + "...")
+		longBody := make([]byte, 300)
+		for i := range longBody {
+			longBody[i] = 'x'
+		}
+		w.Write(longBody)
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx := context.Background()
+	_, err := searchWithKey(ctx, "example.com", "test_key", 1*time.Second)
+
+	if err == nil {
+		t.Error("Expected error for bad request")
+	} else {
+		errMsg := err.Error()
+		// Should contain "..." for truncation
+		if !strings.Contains(errMsg, "...") {
+			t.Errorf("Expected truncated message with '...', got: %v", err)
+		}
+		// Error message shouldn't be >300 chars total
+		if len(errMsg) > 300 {
+			t.Errorf("Error message too long (%d chars): %s", len(errMsg), errMsg)
+		}
+	}
+}
+
+func TestSearchWithKey_EmptyResponse(t *testing.T) {
+	// Test with empty but valid response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(DNSDumpsterResponse{})
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx := context.Background()
+	ips, err := searchWithKey(ctx, "example.com", "test_key", 1*time.Second)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(ips) != 0 {
+		t.Errorf("Expected 0 IPs, got %d", len(ips))
 	}
 }
 

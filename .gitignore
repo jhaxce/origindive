@@ -1,10 +1,6 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# Go Binaries
 *.exe
 *.exe~
-*.exe.old
 *.dll
 *.so
 *.dylib
@@ -16,50 +12,28 @@ origindive-*
 
 # Code coverage profiles and other test artifacts
 *.out
-/coverage
 coverage.*
 *.coverprofile
 profile.cov
-*_coverage_test.go
-*_integration_test.go
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
+# Go workspace
 go.work
 go.work.sum
 
-# Build artifacts
-dist/
-*.zip
-*.tar.gz
-*.deb
-*.rpm
-
-# Generated output files (scan results)
+# Generated output files
 *-passive-*.txt
 *-active-*.txt
 *-auto-*.txt
+*-ips.txt
+*-ips.json
 
-# env file
+# Environment
 .env
 .env.local
 .env.*.local
 
-# Editor/IDE
-# .idea/
-# .vscode/
-
-# AI generated files
-copilot-instructions.md
-
-# Documentation
+# Documentation (if auto-generated)
 docs/
 
-# Scripts
+# Scripts (development only)
 scripts/
-
-# IPs files
-*-ips.txt
-*-ips.json

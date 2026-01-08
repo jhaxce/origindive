@@ -306,3 +306,144 @@ func TestSearchCrtShURL_DirectCall(t *testing.T) {
 		t.Log("searchCrtShURL succeeded (might have network access)")
 	}
 }
+
+// ============================================================================
+// Mock Server Tests for searchCrtShURL
+// ============================================================================
+
+func TestSearchCrtShURL_MockSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		entries := []CTEntry{
+			{
+				CommonName: "example.com",
+				NameValue:  "example.com\nwww.example.com\napi.example.com",
+			},
+			{
+				CommonName: "sub.example.com",
+				NameValue:  "sub.example.com",
+			},
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(entries)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	ips, err := searchCrtShURL(ctx, server.URL, "example.com", 5*time.Second)
+	if err != nil {
+		t.Logf("Error (expected if no DNS resolution): %v", err)
+	}
+	t.Logf("Returned %d IPs", len(ips))
+}
+
+func TestSearchCrtShURL_Mock502Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		w.Write([]byte("<html>502 Bad Gateway</html>"))
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	_, err := searchCrtShURL(ctx, server.URL, "example.com", 5*time.Second)
+	if err == nil {
+		t.Error("Expected error for 502 response")
+	}
+	// Should detect gateway error
+	if !containsStr(err.Error(), "502") && !containsStr(err.Error(), "gateway") {
+		t.Errorf("Expected gateway error, got: %v", err)
+	}
+}
+
+func TestSearchCrtShURL_Mock503Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("Service Temporarily Unavailable"))
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	_, err := searchCrtShURL(ctx, server.URL, "example.com", 5*time.Second)
+	if err == nil {
+		t.Error("Expected error for 503 response")
+	}
+}
+
+func TestSearchCrtShURL_MockInvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("not valid json"))
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	_, err := searchCrtShURL(ctx, server.URL, "example.com", 5*time.Second)
+	if err == nil {
+		t.Error("Expected error for invalid JSON")
+	}
+	if !containsStr(err.Error(), "parse") {
+		t.Errorf("Expected parse error, got: %v", err)
+	}
+}
+
+func TestSearchCrtShURL_MockEmptyResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	ips, err := searchCrtShURL(ctx, server.URL, "example.com", 5*time.Second)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(ips) != 0 {
+		t.Errorf("Expected 0 IPs from empty CT response, got %d", len(ips))
+	}
+}
+
+func TestSearchCrtShURL_MockWildcardFiltering(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		entries := []CTEntry{
+			{
+				CommonName: "example.com",
+				NameValue:  "*.example.com\nexample.com\nwww.example.com",
+			},
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(entries)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	_, err := searchCrtShURL(ctx, server.URL, "example.com", 5*time.Second)
+	if err != nil {
+		t.Logf("Error (expected for DNS resolution): %v", err)
+	}
+	// Wildcards should be filtered out but function still returns IPs from valid subdomains
+}
+
+func TestSearchCrtShURL_MockLongErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		// Write a long non-HTML error message
+		longMsg := make([]byte, 500)
+		for i := range longMsg {
+			longMsg[i] = 'x'
+		}
+		w.Write(longMsg)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	_, err := searchCrtShURL(ctx, server.URL, "example.com", 5*time.Second)
+	if err == nil {
+		t.Error("Expected error for 400 response")
+	}
+	// Error message should be truncated
+	if len(err.Error()) > 300 {
+		t.Logf("Error message length: %d (might not be truncated)", len(err.Error()))
+	}
+}

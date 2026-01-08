@@ -517,3 +517,210 @@ func TestUpdateSource_Structure(t *testing.T) {
 		t.Errorf("Format = %s", source.Format)
 	}
 }
+
+// TestLoadWAFDatabase tests loading WAF database from file
+func TestLoadWAFDatabase(t *testing.T) {
+	// Use the actual database file
+	db, err := LoadWAFDatabase("../../data/waf_ranges.json")
+	if err != nil {
+		t.Fatalf("LoadWAFDatabase() error: %v", err)
+	}
+
+	if db == nil {
+		t.Fatal("LoadWAFDatabase() returned nil")
+	}
+
+	if len(db.Providers) == 0 {
+		t.Error("Expected providers in database")
+	}
+}
+
+// TestLoadWAFDatabase_NotFound tests loading non-existent file
+func TestLoadWAFDatabase_NotFound(t *testing.T) {
+	_, err := LoadWAFDatabase("nonexistent.json")
+	if err == nil {
+		t.Error("Expected error for non-existent file")
+	}
+}
+
+// TestSaveWAFDatabase tests saving WAF database
+func TestSaveWAFDatabase(t *testing.T) {
+	db := &WAFDatabase{
+		Providers: []Provider{
+			{
+				ID:     "test",
+				Name:   "Test Provider",
+				Ranges: []string{"192.168.1.0/24"},
+			},
+		},
+	}
+
+	tmpFile := "test_waf_db.json"
+	defer os.Remove(tmpFile)
+
+	err := SaveWAFDatabase(tmpFile, db)
+	if err != nil {
+		t.Fatalf("SaveWAFDatabase() error: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(tmpFile); os.IsNotExist(err) {
+		t.Error("File was not created")
+	}
+
+	// Load it back
+	loaded, err := LoadWAFDatabase(tmpFile)
+	if err != nil {
+		t.Fatalf("Failed to load saved database: %v", err)
+	}
+
+	if len(loaded.Providers) != 1 {
+		t.Errorf("Expected 1 provider, got %d", len(loaded.Providers))
+	}
+}
+
+// TestWAFDatabase_GetProvider tests GetProvider method
+func TestWAFDatabase_GetProvider(t *testing.T) {
+	db := &WAFDatabase{
+		Providers: []Provider{
+			{ID: "cloudflare", Name: "Cloudflare"},
+			{ID: "aws", Name: "AWS CloudFront"},
+		},
+	}
+
+	tests := []struct {
+		id    string
+		found bool
+	}{
+		{"cloudflare", true},
+		{"aws", true},
+		{"nonexistent", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		provider := db.GetProvider(tt.id)
+		if tt.found && provider == nil {
+			t.Errorf("GetProvider(%q) returned nil, want provider", tt.id)
+		}
+		if !tt.found && provider != nil {
+			t.Errorf("GetProvider(%q) returned %v, want nil", tt.id, provider)
+		}
+	}
+}
+
+// TestWAFDatabase_GetProviderByName tests GetProviderByName method
+func TestWAFDatabase_GetProviderByName(t *testing.T) {
+	db := &WAFDatabase{
+		Providers: []Provider{
+			{ID: "cloudflare", Name: "Cloudflare"},
+			{ID: "aws", Name: "AWS CloudFront"},
+		},
+	}
+
+	tests := []struct {
+		name  string
+		found bool
+	}{
+		{"Cloudflare", true},
+		{"cloudflare", true},
+		{"CLOUDFLARE", true},
+		{"aws", true},
+		{"AWS CloudFront", true},
+		{"nonexistent", false},
+	}
+
+	for _, tt := range tests {
+		provider := db.GetProviderByName(tt.name)
+		if tt.found && provider == nil {
+			t.Errorf("GetProviderByName(%q) returned nil, want provider", tt.name)
+		}
+		if !tt.found && provider != nil {
+			t.Errorf("GetProviderByName(%q) returned %v, want nil", tt.name, provider)
+		}
+	}
+}
+
+// TestWAFDatabase_ListProviders tests ListProviders method
+func TestWAFDatabase_ListProviders(t *testing.T) {
+	db := &WAFDatabase{
+		Providers: []Provider{
+			{ID: "cloudflare"},
+			{ID: "aws"},
+			{ID: "fastly"},
+		},
+	}
+
+	ids := db.ListProviders()
+	if len(ids) != 3 {
+		t.Errorf("Expected 3 provider IDs, got %d", len(ids))
+	}
+
+	expected := map[string]bool{"cloudflare": true, "aws": true, "fastly": true}
+	for _, id := range ids {
+		if !expected[id] {
+			t.Errorf("Unexpected provider ID: %s", id)
+		}
+	}
+}
+
+// TestWAFDatabase_GetTotalRanges tests GetTotalRanges method
+func TestWAFDatabase_GetTotalRanges(t *testing.T) {
+	db := &WAFDatabase{
+		Providers: []Provider{
+			{Ranges: []string{"192.168.1.0/24", "10.0.0.0/8"}},
+			{Ranges: []string{"172.16.0.0/12"}},
+		},
+	}
+
+	total := db.GetTotalRanges()
+	if total != 3 {
+		t.Errorf("GetTotalRanges() = %d, want 3", total)
+	}
+}
+
+// TestWAFDatabase_ValidateRanges tests ValidateRanges method
+func TestWAFDatabase_ValidateRanges(t *testing.T) {
+	tests := []struct {
+		name    string
+		db      *WAFDatabase
+		wantErr bool
+	}{
+		{
+			name: "valid ranges",
+			db: &WAFDatabase{
+				Providers: []Provider{
+					{ID: "test", Ranges: []string{"192.168.1.0/24", "10.0.0.0/8"}},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid CIDR",
+			db: &WAFDatabase{
+				Providers: []Provider{
+					{ID: "test", Ranges: []string{"invalid-cidr"}},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "mixed valid and invalid",
+			db: &WAFDatabase{
+				Providers: []Provider{
+					{ID: "test", Ranges: []string{"192.168.1.0/24", "not-a-cidr"}},
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.db.ValidateRanges()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRanges() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

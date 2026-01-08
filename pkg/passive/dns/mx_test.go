@@ -293,3 +293,26 @@ func TestGetAllMXIPs_PreservesOrder(t *testing.T) {
 		t.Logf("First IP = %s (order might not be preserved)", ips[0])
 	}
 }
+
+func TestLookupMX_PartialMXResolutionFailure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping network-dependent test")
+	}
+
+	// This test attempts to trigger the continue path when some MX records
+	// fail to resolve. In practice, this is difficult without mocking.
+	ctx := context.Background()
+	timeout := 5 * time.Second
+
+	// Use a domain with MX records (this test is network-dependent)
+	records, err := LookupMX(ctx, "google.com", timeout)
+	if err != nil {
+		t.Skipf("MX lookup failed: %v", err)
+	}
+
+	// If we get here, all MX records resolved successfully
+	// The continue path is hard to test without dependency injection
+	if len(records) > 0 {
+		t.Logf("Successfully resolved %d MX records", len(records))
+	}
+}

@@ -41,6 +41,9 @@ type IPDetail struct {
 	PTR         string `json:"ptr"`
 }
 
+// apiBaseURL is the DNSDumpster API endpoint (can be overridden in tests)
+var apiBaseURL = "https://api.dnsdumpster.com/domain/"
+
 // SearchDomain queries DNSDumpster API for domain information
 func SearchDomain(ctx context.Context, domain string, apiKeys []string, timeout time.Duration) ([]string, error) {
 	if len(apiKeys) == 0 {
@@ -79,7 +82,7 @@ func SearchDomain(ctx context.Context, domain string, apiKeys []string, timeout 
 
 // searchWithKey performs the search with a single API key
 func searchWithKey(ctx context.Context, domain, apiKey string, timeout time.Duration) ([]string, error) {
-	url := fmt.Sprintf("https://api.dnsdumpster.com/domain/%s", domain)
+	url := fmt.Sprintf("%s%s", apiBaseURL, domain)
 
 	client := &http.Client{
 		Timeout: timeout,

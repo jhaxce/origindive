@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jhaxce/origindive/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/core"
 )
 
 // Writer handles output to console and file

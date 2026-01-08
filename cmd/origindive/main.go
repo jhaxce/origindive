@@ -16,26 +16,26 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/jhaxce/origindive/internal/colors"
-	"github.com/jhaxce/origindive/internal/version"
-	"github.com/jhaxce/origindive/pkg/asn"
-	"github.com/jhaxce/origindive/pkg/core"
-	"github.com/jhaxce/origindive/pkg/ip"
-	"github.com/jhaxce/origindive/pkg/output"
-	"github.com/jhaxce/origindive/pkg/passive/censys"
-	"github.com/jhaxce/origindive/pkg/passive/ct"
-	passivedns "github.com/jhaxce/origindive/pkg/passive/dns"
-	"github.com/jhaxce/origindive/pkg/passive/dnsdumpster"
-	"github.com/jhaxce/origindive/pkg/passive/securitytrails"
-	"github.com/jhaxce/origindive/pkg/passive/shodan"
-	"github.com/jhaxce/origindive/pkg/passive/subdomain"
-	"github.com/jhaxce/origindive/pkg/passive/viewdns"
-	"github.com/jhaxce/origindive/pkg/passive/virustotal"
-	"github.com/jhaxce/origindive/pkg/passive/wayback"
-	"github.com/jhaxce/origindive/pkg/passive/zoomeye"
-	"github.com/jhaxce/origindive/pkg/scanner"
-	"github.com/jhaxce/origindive/pkg/update"
-	"github.com/jhaxce/origindive/pkg/waf"
+	"github.com/jhaxce/origindive/v3/internal/colors"
+	"github.com/jhaxce/origindive/v3/internal/version"
+	"github.com/jhaxce/origindive/v3/pkg/asn"
+	"github.com/jhaxce/origindive/v3/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/ip"
+	"github.com/jhaxce/origindive/v3/pkg/output"
+	"github.com/jhaxce/origindive/v3/pkg/passive/censys"
+	"github.com/jhaxce/origindive/v3/pkg/passive/ct"
+	passivedns "github.com/jhaxce/origindive/v3/pkg/passive/dns"
+	"github.com/jhaxce/origindive/v3/pkg/passive/dnsdumpster"
+	"github.com/jhaxce/origindive/v3/pkg/passive/securitytrails"
+	"github.com/jhaxce/origindive/v3/pkg/passive/shodan"
+	"github.com/jhaxce/origindive/v3/pkg/passive/subdomain"
+	"github.com/jhaxce/origindive/v3/pkg/passive/viewdns"
+	"github.com/jhaxce/origindive/v3/pkg/passive/virustotal"
+	"github.com/jhaxce/origindive/v3/pkg/passive/wayback"
+	"github.com/jhaxce/origindive/v3/pkg/passive/zoomeye"
+	"github.com/jhaxce/origindive/v3/pkg/scanner"
+	"github.com/jhaxce/origindive/v3/pkg/update"
+	"github.com/jhaxce/origindive/v3/pkg/waf"
 )
 
 func main() {
@@ -601,6 +601,36 @@ func parseFlags() (*core.Config, bool) {
 	return config, outputFlagProvided
 }
 
+// ============================================================================
+// Global Configuration Setup
+// ============================================================================
+
+// promptForAPIKeys prompts for multiple API keys with a given service name.
+// Returns the collected keys (may be empty if user skips).
+func promptForAPIKeys(scanner *bufio.Scanner, serviceName, getKeyURL, docsURL string) []string {
+	fmt.Printf("\n%s%s API Keys%s\n", colors.CYAN, serviceName, colors.NC)
+	fmt.Printf("Get API key: %s | Docs: %s\n", getKeyURL, docsURL)
+	fmt.Println("Enter keys one at a time (empty line to finish):")
+
+	var keys []string
+	for i := 1; ; i++ {
+		fmt.Printf("  Key #%d: ", i)
+		if !scanner.Scan() {
+			break
+		}
+		key := strings.TrimSpace(scanner.Text())
+		if key == "" {
+			break
+		}
+		keys = append(keys, key)
+	}
+
+	if len(keys) > 0 {
+		fmt.Printf("%s✓ Added %d %s key(s)%s\n", colors.GREEN, len(keys), serviceName, colors.NC)
+	}
+	return keys
+}
+
 // initializeGlobalConfig creates and saves a global config file with prompts
 func initializeGlobalConfig() error {
 	colors.Init(true)
@@ -639,198 +669,56 @@ func initializeGlobalConfig() error {
 	fmt.Printf("%sAPI Keys Setup (optional - press Enter to skip)%s\n", colors.GREEN, colors.NC)
 	fmt.Println(strings.Repeat("─", 63))
 
-	// Shodan keys
-	fmt.Printf("\n%sShodan API Keys%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API key: https://account.shodan.io/ | Docs: https://developer.shodan.io/api\n")
-	fmt.Println("Enter keys one at a time (empty line to finish):")
-	var shodanKeys []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Key #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		key := strings.TrimSpace(scanner.Text())
-		if key == "" {
-			break
-		}
-		shodanKeys = append(shodanKeys, key)
-	}
-	if len(shodanKeys) > 0 {
-		config.ShodanKeys = shodanKeys
-		fmt.Printf("%s✓ Added %d Shodan key(s)%s\n", colors.GREEN, len(shodanKeys), colors.NC)
-	}
+	// Collect API keys using helper function
+	config.ShodanKeys = promptForAPIKeys(scanner, "Shodan",
+		"https://account.shodan.io/", "https://developer.shodan.io/api")
 
-	// Censys API tokens
-	fmt.Printf("\n%sCensys API Tokens%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API token: https://accounts.censys.io/settings/personal-access-tokens | Docs: https://docs.censys.com/reference/get-started\n")
-	fmt.Println("Enter API tokens one at a time (empty line to finish):")
-	var censysTokens []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Token #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		token := strings.TrimSpace(scanner.Text())
-		if token == "" {
-			break
-		}
-		censysTokens = append(censysTokens, token)
-	}
-	if len(censysTokens) > 0 {
-		config.CensysTokens = censysTokens
-		fmt.Printf("%s✓ Added %d Censys token(s)%s\n", colors.GREEN, len(censysTokens), colors.NC)
-
-		// Prompt for Organization ID (required for API)
+	// Censys has special handling for Org ID
+	config.CensysTokens = promptForAPIKeys(scanner, "Censys",
+		"https://accounts.censys.io/settings/personal-access-tokens", "https://docs.censys.com/reference/get-started")
+	if len(config.CensysTokens) > 0 {
 		fmt.Printf("\n%sCensys Organization ID%s (required for API access)\n", colors.CYAN, colors.NC)
 		fmt.Printf("  Org ID: ")
 		if scanner.Scan() {
-			orgID := strings.TrimSpace(scanner.Text())
-			if orgID != "" {
+			if orgID := strings.TrimSpace(scanner.Text()); orgID != "" {
 				config.CensysOrgID = orgID
 				fmt.Printf("%s✓ Added Censys Org ID%s\n", colors.GREEN, colors.NC)
 			}
 		}
 	}
 
-	// SecurityTrails keys
-	fmt.Printf("\n%sSecurityTrails API Keys%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API key: https://securitytrails.com/app/account/credentials | Docs: https://securitytrails.com/app/account/docs-and-examples\n")
-	fmt.Println("Enter keys one at a time (empty line to finish):")
-	var securitytrailsKeys []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Key #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		key := strings.TrimSpace(scanner.Text())
-		if key == "" {
-			break
-		}
-		securitytrailsKeys = append(securitytrailsKeys, key)
-	}
-	if len(securitytrailsKeys) > 0 {
-		config.SecurityTrailsKeys = securitytrailsKeys
-		fmt.Printf("%s✓ Added %d SecurityTrails key(s)%s\n", colors.GREEN, len(securitytrailsKeys), colors.NC)
-	}
+	config.SecurityTrailsKeys = promptForAPIKeys(scanner, "SecurityTrails",
+		"https://securitytrails.com/app/account/credentials", "https://securitytrails.com/app/account/docs-and-examples")
 
-	// VirusTotal keys
-	fmt.Printf("\n%sVirusTotal API Keys%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API key: https://www.virustotal.com/gui/user/[USERNAME]/apikey | Docs: https://docs.virustotal.com/reference/overview\n")
-	fmt.Println("Enter keys one at a time (empty line to finish):")
-	var virustotalKeys []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Key #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		key := strings.TrimSpace(scanner.Text())
-		if key == "" {
-			break
-		}
-		virustotalKeys = append(virustotalKeys, key)
-	}
-	if len(virustotalKeys) > 0 {
-		config.VirusTotalKeys = virustotalKeys
-		fmt.Printf("%s✓ Added %d VirusTotal key(s)%s\n", colors.GREEN, len(virustotalKeys), colors.NC)
-	}
+	config.VirusTotalKeys = promptForAPIKeys(scanner, "VirusTotal",
+		"https://www.virustotal.com/gui/user/[USERNAME]/apikey", "https://docs.virustotal.com/reference/overview")
 
-	// ZoomEye keys
-	fmt.Printf("\n%sZoomEye API Keys%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API key: https://www.zoomeye.ai/profile | Docs: https://www.zoomeye.ai/doc\n")
-	fmt.Println("Enter keys one at a time (empty line to finish):")
-	var zoomeyeKeys []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Key #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		key := strings.TrimSpace(scanner.Text())
-		if key == "" {
-			break
-		}
-		zoomeyeKeys = append(zoomeyeKeys, key)
-	}
-	if len(zoomeyeKeys) > 0 {
-		config.ZoomEyeKeys = zoomeyeKeys
-		fmt.Printf("%s✓ Added %d ZoomEye key(s)%s\n", colors.GREEN, len(zoomeyeKeys), colors.NC)
-	}
+	config.ZoomEyeKeys = promptForAPIKeys(scanner, "ZoomEye",
+		"https://www.zoomeye.ai/profile", "https://www.zoomeye.ai/doc")
 
-	// ViewDNS keys
-	fmt.Printf("\n%sViewDNS API Keys%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API key: https://viewdns.info/dashboard/api/account-details/ | Docs: https://viewdns.info/api/\n")
-	fmt.Println("Enter keys one at a time (empty line to finish):")
-	var viewdnsKeys []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Key #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		key := strings.TrimSpace(scanner.Text())
-		if key == "" {
-			break
-		}
-		viewdnsKeys = append(viewdnsKeys, key)
-	}
-	if len(viewdnsKeys) > 0 {
-		config.ViewDNSKeys = viewdnsKeys
-		fmt.Printf("%s✓ Added %d ViewDNS key(s)%s\n", colors.GREEN, len(viewdnsKeys), colors.NC)
-	}
+	config.ViewDNSKeys = promptForAPIKeys(scanner, "ViewDNS",
+		"https://viewdns.info/dashboard/api/account-details/", "https://viewdns.info/api/")
 
-	// DNSDumpster keys
-	fmt.Printf("\n%sDNSDumpster API Keys%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API key: https://dnsdumpster.com/my-account/ | Docs: https://dnsdumpster.com/developer/\n")
-	fmt.Println("Enter keys one at a time (empty line to finish):")
-	var dnsdumpsterKeys []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Key #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		key := strings.TrimSpace(scanner.Text())
-		if key == "" {
-			break
-		}
-		dnsdumpsterKeys = append(dnsdumpsterKeys, key)
-	}
-	if len(dnsdumpsterKeys) > 0 {
-		config.DNSDumpsterKeys = dnsdumpsterKeys
-		fmt.Printf("%s✓ Added %d DNSDumpster key(s)%s\n", colors.GREEN, len(dnsdumpsterKeys), colors.NC)
-	}
+	config.DNSDumpsterKeys = promptForAPIKeys(scanner, "DNSDumpster",
+		"https://dnsdumpster.com/my-account/", "https://dnsdumpster.com/developer/")
 
-	// Webshare proxy keys
-	fmt.Printf("\n%sWebshare Proxy API Keys%s\n", colors.CYAN, colors.NC)
-	fmt.Printf("Get API key: https://dashboard.webshare.io/userapi/keys | Docs: https://apidocs.webshare.io/\n")
-	fmt.Println("Enter keys one at a time (empty line to finish):")
-	var webshareKeys []string
-	for i := 1; ; i++ {
-		fmt.Printf("  Key #%d: ", i)
-		if !scanner.Scan() {
-			break
-		}
-		key := strings.TrimSpace(scanner.Text())
-		if key == "" {
-			break
-		}
-		webshareKeys = append(webshareKeys, key)
-	}
-	if len(webshareKeys) > 0 {
-		config.WebshareKeys = webshareKeys
-		fmt.Printf("%s✓ Added %d Webshare key(s)%s\n", colors.GREEN, len(webshareKeys), colors.NC)
-
-		// Optional: Webshare Plan IDs
+	// Webshare has special handling for Plan IDs
+	config.WebshareKeys = promptForAPIKeys(scanner, "Webshare Proxy",
+		"https://dashboard.webshare.io/userapi/keys", "https://apidocs.webshare.io/")
+	if len(config.WebshareKeys) > 0 {
 		fmt.Printf("\n%sWebshare Plan IDs (optional - press Enter to skip)%s\n", colors.CYAN, colors.NC)
 		fmt.Println("Enter plan IDs one at a time (maps 1:1 with keys, empty line to finish):")
 		var websharePlanIDs []string
-		for i := 1; i <= len(webshareKeys); i++ {
+		for i := 1; i <= len(config.WebshareKeys); i++ {
 			fmt.Printf("  Plan ID for Key #%d: ", i)
 			if !scanner.Scan() {
 				break
 			}
-			planID := strings.TrimSpace(scanner.Text())
-			if planID == "" {
+			if planID := strings.TrimSpace(scanner.Text()); planID != "" {
+				websharePlanIDs = append(websharePlanIDs, planID)
+			} else {
 				break
 			}
-			websharePlanIDs = append(websharePlanIDs, planID)
 		}
 		if len(websharePlanIDs) > 0 {
 			config.WebsharePlanIDs = websharePlanIDs

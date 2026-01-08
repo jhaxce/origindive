@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jhaxce/origindive/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/core"
 )
 
 // ASNResponse represents the response from ipapi.is API

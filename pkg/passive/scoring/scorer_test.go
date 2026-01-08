@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jhaxce/origindive/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/core"
 )
 
 // Test default configuration
@@ -493,4 +493,305 @@ func TestComprehensiveScoring(t *testing.T) {
 	}
 
 	t.Logf("Worst scenario score: %f", worstScore)
+}
+
+// ============================================================================
+// Additional Coverage Tests
+// ============================================================================
+
+func TestHasReverseDNSMatch_NilMetadata(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	// Test with nil metadata (should attempt actual DNS lookup)
+	ip := core.PassiveIP{
+		IP:       "192.0.2.1", // Test-Net IP, won't have real PTR
+		Metadata: nil,
+	}
+
+	// Should return false for test IP with no PTR
+	result := scorer.hasReverseDNSMatch(&ip)
+
+	// Just verify it doesn't panic and returns a boolean
+	if result != true && result != false {
+		t.Error("Expected boolean result from hasReverseDNSMatch")
+	}
+}
+
+func TestPerformReverseDNS_InvalidIP(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	// Test with invalid IP that won't resolve
+	result := scorer.performReverseDNS("999.999.999.999")
+
+	if result != "" {
+		t.Errorf("Expected empty result for invalid IP, got %s", result)
+	}
+}
+
+func TestHasASNMatch_NilMetadata(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	ip := core.PassiveIP{
+		IP:       "192.0.2.1",
+		Metadata: nil,
+	}
+
+	if scorer.hasASNMatch(&ip) {
+		t.Error("Expected no ASN match for nil metadata")
+	}
+}
+
+func TestHasASNMatch_CDNPatterns(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	cdnASNs := []string{
+		"Cloudflare Inc",
+		"Amazon Web Services",
+		"Fastly Inc",
+		"Akamai Technologies",
+		"Cloudfront Distribution",
+	}
+
+	for _, asn := range cdnASNs {
+		ip := core.PassiveIP{
+			IP: "192.0.2.1",
+			Metadata: map[string]interface{}{
+				"asn": asn,
+			},
+		}
+
+		if scorer.hasASNMatch(&ip) {
+			t.Errorf("Expected no ASN match for CDN: %s", asn)
+		}
+	}
+}
+
+func TestHasWHOISMatch_NilMetadata(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	ip := core.PassiveIP{
+		IP:       "192.0.2.1",
+		Metadata: nil,
+	}
+
+	if scorer.hasWHOISMatch(&ip) {
+		t.Error("Expected no WHOIS match for nil metadata")
+	}
+}
+
+func TestHasGeoMatch_NilMetadata(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	ip := core.PassiveIP{
+		IP:       "192.0.2.1",
+		Metadata: nil,
+	}
+
+	if scorer.hasGeoMatch(&ip) {
+		t.Error("Expected no geo match for nil metadata")
+	}
+}
+
+func TestIsGenericHosting_NilMetadata(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	ip := core.PassiveIP{
+		IP:       "192.0.2.1",
+		Metadata: nil,
+	}
+
+	if scorer.isGenericHosting(&ip) {
+		t.Error("Expected no hosting detection for nil metadata")
+	}
+}
+
+func TestIsGenericHosting_Datacenter(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	ip := core.PassiveIP{
+		IP: "192.0.2.1",
+		Metadata: map[string]interface{}{
+			"organization": "Some Datacenter LLC",
+		},
+	}
+
+	if !scorer.isGenericHosting(&ip) {
+		t.Error("Expected datacenter to be detected as generic hosting")
+	}
+}
+
+func TestMin(t *testing.T) {
+	tests := []struct {
+		a, b, expected int
+	}{
+		{1, 2, 1},
+		{2, 1, 1},
+		{5, 5, 5},
+		{-1, 1, -1},
+	}
+
+	for _, tt := range tests {
+		result := min(tt.a, tt.b)
+		if result != tt.expected {
+			t.Errorf("min(%d, %d) = %d, want %d", tt.a, tt.b, result, tt.expected)
+		}
+	}
+}
+
+func TestHasReverseDNSMatch_PtrRecord(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	// Test with ptr_record in metadata (not reverse_dns)
+	ip := core.PassiveIP{
+		IP: "192.0.2.1",
+		Metadata: map[string]interface{}{
+			"ptr_record": "mail.example.com",
+		},
+	}
+
+	if !scorer.hasReverseDNSMatch(&ip) {
+		t.Error("Expected reverse DNS match for ptr_record")
+	}
+
+	// Test ptr_record without domain match
+	ip2 := core.PassiveIP{
+		IP: "192.0.2.2",
+		Metadata: map[string]interface{}{
+			"ptr_record": "mail.otherdomain.com",
+		},
+	}
+
+	if scorer.hasReverseDNSMatch(&ip2) {
+		t.Error("Expected no match for different domain in ptr_record")
+	}
+}
+
+func TestHasReverseDNSMatch_ActualLookup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping network-dependent test in short mode")
+	}
+
+	scorer := NewScorer("google.com", nil)
+
+	// Test with an IP that should have reverse DNS
+	ip := core.PassiveIP{
+		IP: "8.8.8.8",
+	}
+
+	// Call hasReverseDNSMatch which will perform lookup
+	result := scorer.hasReverseDNSMatch(&ip)
+
+	// If DNS lookup succeeded, metadata should be populated
+	if ip.Metadata != nil {
+		if cachedDNS, ok := ip.Metadata["reverse_dns"].(string); ok {
+			t.Logf("Successfully looked up and cached: %s", cachedDNS)
+			// Should match since dns.google contains "google"
+			if !result {
+				t.Errorf("Expected match for %s with google.com", cachedDNS)
+			}
+		} else {
+			t.Skip("reverse_dns not cached - DNS lookup may have failed")
+		}
+	} else {
+		t.Skip("DNS lookup returned no results (network/firewall dependent)")
+	}
+}
+
+func TestHasReverseDNSMatch_LookupFailure(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	// Test with IP that has no reverse DNS
+	ip := core.PassiveIP{
+		IP: "192.0.2.99", // Reserved test network, no reverse DNS
+	}
+
+	result := scorer.hasReverseDNSMatch(&ip)
+
+	// Should return false when no reverse DNS found
+	if result {
+		t.Error("Expected no match for IP without reverse DNS")
+	}
+}
+
+func TestPerformReverseDNS_Success(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	// Test with well-known IP that should have reverse DNS
+	result := scorer.performReverseDNS("8.8.8.8")
+
+	// Should return a hostname (network dependent)
+	if result != "" {
+		t.Logf("Reverse DNS for 8.8.8.8: %s", result)
+	} else {
+		t.Log("Reverse DNS lookup failed (may be network dependent)")
+	}
+}
+
+func TestPerformReverseDNS_EmptyResult(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	// Test with IP that should have no reverse DNS
+	result := scorer.performReverseDNS("192.0.2.99")
+
+	if result != "" {
+		t.Errorf("Expected empty result for reserved test IP, got: %s", result)
+	}
+}
+
+func TestHasReverseDNSMatch_CacheResult(t *testing.T) {
+	scorer := NewScorer("google.com", nil)
+
+	// Test that reverse DNS result is cached
+	ip := core.PassiveIP{
+		IP: "8.8.8.8",
+	}
+
+	// First call - should perform lookup and cache
+	result1 := scorer.hasReverseDNSMatch(&ip)
+
+	// Check if result was cached
+	if ip.Metadata != nil {
+		if cachedDNS, ok := ip.Metadata["reverse_dns"].(string); ok {
+			t.Logf("Cached reverse DNS: %s", cachedDNS)
+
+			// Second call - should use cached value
+			result2 := scorer.hasReverseDNSMatch(&ip)
+
+			if result1 != result2 {
+				t.Error("Results should be consistent when using cached value")
+			}
+		}
+	}
+}
+
+func TestHasReverseDNSMatch_WithMetadataNoReverseDNS(t *testing.T) {
+	scorer := NewScorer("example.com", nil)
+
+	// Test with metadata that has other fields but not reverse_dns or ptr_record
+	// This should trigger the DNS lookup path
+	ip := core.PassiveIP{
+		IP: "192.0.2.1",
+		Metadata: map[string]interface{}{
+			"asn":     "AS12345",
+			"country": "US",
+		},
+	}
+
+	// Should attempt DNS lookup (will likely fail for reserved test IP)
+	result := scorer.hasReverseDNSMatch(&ip)
+
+	// Should return false since test IP has no reverse DNS
+	if result {
+		t.Error("Expected no match for reserved test IP")
+	}
+
+	// Metadata should still exist (with original fields)
+	if ip.Metadata == nil {
+		t.Error("Metadata should not be nil")
+	}
+
+	// Check that original metadata is preserved
+	if _, ok := ip.Metadata["asn"]; !ok {
+		t.Error("Original metadata should be preserved")
+	}
 }

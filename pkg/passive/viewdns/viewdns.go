@@ -37,6 +37,9 @@ type ViewDNSDomain struct {
 	LastResolved string `json:"last_resolved"`
 }
 
+// apiBaseURL is the ViewDNS API endpoint (can be overridden in tests)
+var apiBaseURL = "https://api.viewdns.info/reverseip/"
+
 // SearchReverseIP queries ViewDNS reverse IP lookup for domains on the same server
 func SearchReverseIP(ctx context.Context, domain string, apiKeys []string, timeout time.Duration) ([]string, error) {
 	if len(apiKeys) == 0 {
@@ -100,8 +103,8 @@ func SearchReverseIP(ctx context.Context, domain string, apiKeys []string, timeo
 
 // reverseIPWithKey performs reverse IP lookup with a single API key
 func reverseIPWithKey(ctx context.Context, ipAddr, apiKey string, timeout time.Duration) ([]string, error) {
-	apiURL := fmt.Sprintf("https://api.viewdns.info/reverseip/?host=%s&apikey=%s&output=json",
-		url.QueryEscape(ipAddr), url.QueryEscape(apiKey))
+	apiURL := fmt.Sprintf("%s?host=%s&apikey=%s&output=json",
+		apiBaseURL, url.QueryEscape(ipAddr), url.QueryEscape(apiKey))
 
 	client := &http.Client{
 		Timeout: timeout,

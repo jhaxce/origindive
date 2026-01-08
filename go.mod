@@ -1,4 +1,4 @@
-module github.com/jhaxce/origindive
+module github.com/jhaxce/origindive/v3
 
 go 1.24.0
 

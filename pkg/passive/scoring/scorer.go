@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jhaxce/origindive/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/core"
 )
 
 // Scorer calculates confidence scores for passive IPs

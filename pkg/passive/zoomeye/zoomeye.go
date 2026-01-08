@@ -41,6 +41,9 @@ type ZoomEyeV2Asset struct {
 	UpdateTime string `json:"update_time"`
 }
 
+// apiURL is the ZoomEye v2 API endpoint (can be overridden in tests)
+var apiURL = "https://api.zoomeye.ai/v2/search"
+
 // SearchHost queries ZoomEye for hosts matching the domain
 func SearchHost(ctx context.Context, domain string, apiKeys []string, timeout time.Duration) ([]string, error) {
 	if len(apiKeys) == 0 {
@@ -96,14 +99,12 @@ func searchWithKey(ctx context.Context, domain, apiKey string, timeout time.Dura
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Use v2 POST API endpoint
-	url := "https://api.zoomeye.ai/v2/search"
-
+	// Use v2 POST API endpoint (from package variable)
 	client := &http.Client{
 		Timeout: timeout,
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

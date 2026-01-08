@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jhaxce/origindive/internal/version"
+	"github.com/jhaxce/origindive/v3/internal/version"
 )
 
 const (

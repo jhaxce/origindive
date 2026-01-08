@@ -231,3 +231,194 @@ func TestOutputFormat(t *testing.T) {
 		t.Errorf("FormatCSV = %s, want csv", FormatCSV)
 	}
 }
+
+// ============================================================================
+// Additional Coverage Tests for MergeWithCLI
+// ============================================================================
+
+func TestMergeWithCLI_AllBooleanFlags(t *testing.T) {
+	fileConfig := DefaultConfig()
+	fileConfig.Domain = "example.com"
+
+	cliConfig := &Config{
+		NoUserAgent: true,
+		SkipWAF:     true,
+		ShowSkipped: true,
+		NoWAFUpdate: true,
+		PassiveOnly: true,
+		AutoScan:    true,
+		Quiet:       true,
+		Verbose:     true,
+		ShowAll:     true,
+		NoColor:     true,
+		NoProgress:  true,
+	}
+
+	fileConfig.MergeWithCLI(cliConfig)
+
+	if !fileConfig.NoUserAgent {
+		t.Error("NoUserAgent not merged")
+	}
+	if !fileConfig.SkipWAF {
+		t.Error("SkipWAF not merged")
+	}
+	if !fileConfig.ShowSkipped {
+		t.Error("ShowSkipped not merged")
+	}
+	if !fileConfig.NoWAFUpdate {
+		t.Error("NoWAFUpdate not merged")
+	}
+	if !fileConfig.PassiveOnly {
+		t.Error("PassiveOnly not merged")
+	}
+	if !fileConfig.AutoScan {
+		t.Error("AutoScan not merged")
+	}
+	if !fileConfig.Quiet {
+		t.Error("Quiet not merged")
+	}
+	if !fileConfig.Verbose {
+		t.Error("Verbose not merged")
+	}
+	if !fileConfig.ShowAll {
+		t.Error("ShowAll not merged")
+	}
+	if !fileConfig.NoColor {
+		t.Error("NoColor not merged")
+	}
+	if !fileConfig.NoProgress {
+		t.Error("NoProgress not merged")
+	}
+}
+
+func TestMergeWithCLI_StringFields(t *testing.T) {
+	fileConfig := DefaultConfig()
+	fileConfig.Domain = "original.com"
+
+	cliConfig := &Config{
+		Mode:          ModeAuto,
+		StartIP:       "192.0.2.1",
+		EndIP:         "192.0.2.254",
+		CIDR:          "192.0.2.0/24",
+		InputFile:     "/path/to/input.txt",
+		CustomHeader:  "X-Custom: value",
+		CustomWAFFile: "/path/to/waf.json",
+		OutputFile:    "/path/to/output.txt",
+		HTTPMethod:    "POST",
+	}
+
+	fileConfig.MergeWithCLI(cliConfig)
+
+	if fileConfig.Mode != ModeAuto {
+		t.Errorf("Mode = %s, want auto", fileConfig.Mode)
+	}
+	if fileConfig.StartIP != "192.0.2.1" {
+		t.Errorf("StartIP = %s, want 192.0.2.1", fileConfig.StartIP)
+	}
+	if fileConfig.EndIP != "192.0.2.254" {
+		t.Errorf("EndIP = %s, want 192.0.2.254", fileConfig.EndIP)
+	}
+	if fileConfig.CIDR != "192.0.2.0/24" {
+		t.Errorf("CIDR = %s, want 192.0.2.0/24", fileConfig.CIDR)
+	}
+	if fileConfig.InputFile != "/path/to/input.txt" {
+		t.Errorf("InputFile = %s", fileConfig.InputFile)
+	}
+	if fileConfig.CustomHeader != "X-Custom: value" {
+		t.Errorf("CustomHeader = %s", fileConfig.CustomHeader)
+	}
+	if fileConfig.CustomWAFFile != "/path/to/waf.json" {
+		t.Errorf("CustomWAFFile = %s", fileConfig.CustomWAFFile)
+	}
+	if fileConfig.OutputFile != "/path/to/output.txt" {
+		t.Errorf("OutputFile = %s", fileConfig.OutputFile)
+	}
+	if fileConfig.HTTPMethod != "POST" {
+		t.Errorf("HTTPMethod = %s, want POST", fileConfig.HTTPMethod)
+	}
+}
+
+func TestMergeWithCLI_SliceFields(t *testing.T) {
+	fileConfig := DefaultConfig()
+	fileConfig.Domain = "example.com"
+
+	cliConfig := &Config{
+		SkipProviders:  []string{"cloudflare", "aws"},
+		PassiveSources: []string{"shodan", "censys"},
+	}
+
+	fileConfig.MergeWithCLI(cliConfig)
+
+	if len(fileConfig.SkipProviders) != 2 {
+		t.Errorf("SkipProviders length = %d, want 2", len(fileConfig.SkipProviders))
+	}
+	if len(fileConfig.PassiveSources) != 2 {
+		t.Errorf("PassiveSources length = %d, want 2", len(fileConfig.PassiveSources))
+	}
+}
+
+func TestMergeWithCLI_TimeoutFields(t *testing.T) {
+	fileConfig := DefaultConfig()
+	fileConfig.Domain = "example.com"
+
+	cliConfig := &Config{
+		Timeout:        10 * time.Second, // Different from default 5s
+		ConnectTimeout: 5 * time.Second,  // Different from default 3s
+	}
+
+	fileConfig.MergeWithCLI(cliConfig)
+
+	if fileConfig.Timeout != 10*time.Second {
+		t.Errorf("Timeout = %v, want 10s", fileConfig.Timeout)
+	}
+	if fileConfig.ConnectTimeout != 5*time.Second {
+		t.Errorf("ConnectTimeout = %v, want 5s", fileConfig.ConnectTimeout)
+	}
+}
+
+func TestMergeWithCLI_MinConfidence(t *testing.T) {
+	fileConfig := DefaultConfig()
+	fileConfig.Domain = "example.com"
+
+	cliConfig := &Config{
+		MinConfidence: 0.5, // Different from default 0.7
+	}
+
+	fileConfig.MergeWithCLI(cliConfig)
+
+	if fileConfig.MinConfidence != 0.5 {
+		t.Errorf("MinConfidence = %f, want 0.5", fileConfig.MinConfidence)
+	}
+}
+
+func TestValidate_ActiveModeNoIPRange(t *testing.T) {
+	config := &Config{
+		Domain: "example.com",
+		Mode:   ModeActive,
+		// No IP range provided - should fail
+	}
+
+	err := config.Validate()
+	if err != ErrNoIPRange {
+		t.Errorf("Validate() error = %v, want ErrNoIPRange", err)
+	}
+}
+
+func TestPassiveConfig_Structure(t *testing.T) {
+	config := PassiveConfig{
+		ShodanKeys:         []string{"key1", "key2"},
+		CensysTokens:       []string{"token1"},
+		SecurityTrailsKeys: []string{"st_key"},
+		ZoomEyeKeys:        []string{"ze_key"},
+		DNSDumpsterKeys:    []string{"dd_key"},
+		VirusTotalKeys:     []string{"vt_key"},
+		ViewDNSKeys:        []string{"vd_key"},
+	}
+
+	if len(config.ShodanKeys) != 2 {
+		t.Errorf("ShodanKeys length = %d, want 2", len(config.ShodanKeys))
+	}
+	if len(config.CensysTokens) != 1 {
+		t.Errorf("CensysTokens length = %d, want 1", len(config.CensysTokens))
+	}
+}

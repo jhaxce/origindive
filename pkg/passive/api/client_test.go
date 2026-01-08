@@ -1,4 +1,4 @@
-package api
+﻿package api
 
 import (
 	"context"
@@ -526,3 +526,4 @@ func TestCensysCredential_Structure(t *testing.T) {
 		t.Errorf("Secret = %s, want test_secret", cred.Secret)
 	}
 }
+

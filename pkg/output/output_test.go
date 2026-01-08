@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jhaxce/origindive/pkg/core"
+	"github.com/jhaxce/origindive/v3/pkg/core"
 )
 
 func TestNewFormatter(t *testing.T) {

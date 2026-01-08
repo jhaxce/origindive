@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -94,10 +95,18 @@ func TestReverseIPWithKey_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx := context.Background()
 	_, err := reverseIPWithKey(ctx, "192.168.1.1", "invalid_key", 1*time.Second)
+
 	if err == nil {
-		t.Log("Expected error for HTTP error")
+		t.Error("Expected error for HTTP error")
+	} else if !strings.Contains(err.Error(), "status 403") {
+		t.Errorf("Expected status 403 error, got: %v", err)
 	}
 }
 
@@ -113,10 +122,18 @@ func TestReverseIPWithKey_APIError(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx := context.Background()
 	_, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 1*time.Second)
+
 	if err == nil {
-		t.Log("Expected API error")
+		t.Error("Expected API error")
+	} else if !strings.Contains(err.Error(), "Invalid API key") {
+		t.Errorf("Expected 'Invalid API key' error, got: %v", err)
 	}
 }
 
@@ -127,10 +144,18 @@ func TestReverseIPWithKey_InvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx := context.Background()
 	_, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 1*time.Second)
+
 	if err == nil {
-		t.Log("Expected JSON parsing error")
+		t.Error("Expected JSON parsing error")
+	} else if !strings.Contains(err.Error(), "failed to parse") {
+		t.Errorf("Expected parse error, got: %v", err)
 	}
 }
 
@@ -197,20 +222,42 @@ func TestReverseIPWithKey_EmptyDomainList(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx := context.Background()
-	_, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 1*time.Second)
-	if err == nil {
-		t.Log("Empty domain list handled")
+	ips, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 1*time.Second)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(ips) != 0 {
+		t.Errorf("Expected 0 IPs for empty domain list, got %d", len(ips))
 	}
 }
 
 func TestReverseIPWithKey_ContextCancellation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
 	_, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 5*time.Second)
+
 	if err == nil {
-		t.Log("Expected error for cancelled context")
+		t.Error("Expected error for cancelled context")
 	}
 }
 
@@ -226,7 +273,7 @@ func TestSearchReverseIP_WhitespaceKeys(t *testing.T) {
 func TestReverseIPWithKey_LongErrorBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		// Write long error message (should be truncated)
+		// Write long error message (should be truncated to 200 chars + "...")
 		longMsg := make([]byte, 300)
 		for i := range longMsg {
 			longMsg[i] = 'x'
@@ -235,12 +282,24 @@ func TestReverseIPWithKey_LongErrorBody(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
 	ctx := context.Background()
 	_, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 1*time.Second)
+
 	if err == nil {
-		t.Log("Expected error for bad request")
-	} else if len(err.Error()) > 300 {
-		t.Logf("Error message might not be truncated: %d chars", len(err.Error()))
+		t.Error("Expected error for bad request")
+	} else {
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "...") {
+			t.Errorf("Expected truncated message with '...', got: %v", err)
+		}
+		if len(errMsg) > 300 {
+			t.Errorf("Error message too long (%d chars): %s", len(errMsg), errMsg)
+		}
 	}
 }
 
@@ -262,5 +321,157 @@ func TestReverseIPWithKey_URLEscaping(t *testing.T) {
 	_, err := reverseIPWithKey(ctx, "192.168.1.1", "key&special=chars", 1*time.Second)
 	if err == nil {
 		t.Log("URL escaping test completed")
+	}
+}
+
+func TestReverseIPWithKey_StatusCodes(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		responseBody   interface{}
+		wantErrContain string
+	}{
+		{
+			name:           "401 Unauthorized",
+			statusCode:     http.StatusUnauthorized,
+			responseBody:   ViewDNSResponse{Response: ViewDNSResults{Error: "Unauthorized"}},
+			wantErrContain: "Unauthorized",
+		},
+		{
+			name:           "429 Rate Limit",
+			statusCode:     http.StatusTooManyRequests,
+			responseBody:   "Rate limit exceeded",
+			wantErrContain: "status 429",
+		},
+		{
+			name:           "500 Server Error",
+			statusCode:     http.StatusInternalServerError,
+			responseBody:   "Internal server error",
+			wantErrContain: "status 500",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+
+				switch v := tt.responseBody.(type) {
+				case ViewDNSResponse:
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(v)
+				case string:
+					w.Write([]byte(v))
+				}
+			}))
+			defer server.Close()
+
+			// Override API URL for testing
+			oldURL := apiBaseURL
+			apiBaseURL = server.URL + "/"
+			defer func() { apiBaseURL = oldURL }()
+
+			ctx := context.Background()
+			_, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 1*time.Second)
+
+			if err == nil {
+				t.Errorf("Expected error for status %d", tt.statusCode)
+			} else if !strings.Contains(err.Error(), tt.wantErrContain) {
+				t.Errorf("Error should contain '%s', got: %v", tt.wantErrContain, err)
+			}
+		})
+	}
+}
+
+func TestReverseIPWithKey_DomainResolution(t *testing.T) {
+	// Test that domains are resolved to IPs (skip resolution failures)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := ViewDNSResponse{
+			Query: ViewDNSQuery{ToolType: 2, Host: "192.168.1.1"},
+			Response: ViewDNSResults{
+				Domains: []ViewDNSDomain{
+					{Name: "localhost", LastResolved: "2024-01-01"},                        // Should resolve
+					{Name: "nonexistent-domain-12345.invalid", LastResolved: "2024-01-01"}, // Should be skipped
+					{Name: "  ", LastResolved: "2024-01-01"},                               // Empty after trim, skip
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx := context.Background()
+	ips, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 5*time.Second)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Should get at least localhost IP (127.0.0.1 or others)
+	if len(ips) == 0 {
+		t.Error("Expected at least 1 IP from localhost resolution")
+	}
+}
+
+func TestReverseIPWithKey_Timeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx := context.Background()
+	_, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 1*time.Millisecond)
+
+	if err == nil {
+		t.Error("Expected timeout error")
+	}
+}
+
+func TestReverseIPWithKey_IPv4FilteringOnly(t *testing.T) {
+	// Test that only IPv4 addresses are returned (IPv6 filtered out)
+	// This is tested via DomainResolution test with localhost (may return ::1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := ViewDNSResponse{
+			Query: ViewDNSQuery{ToolType: 2, Host: "192.168.1.1"},
+			Response: ViewDNSResults{
+				Domains: []ViewDNSDomain{
+					{Name: "localhost", LastResolved: "2024-01-01"},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	// Override API URL for testing
+	oldURL := apiBaseURL
+	apiBaseURL = server.URL + "/"
+	defer func() { apiBaseURL = oldURL }()
+
+	ctx := context.Background()
+	ips, err := reverseIPWithKey(ctx, "192.168.1.1", "test_key", 5*time.Second)
+
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Verify all IPs are IPv4
+	for _, ipStr := range ips {
+		if !strings.Contains(ipStr, ".") || strings.Contains(ipStr, ":") {
+			t.Errorf("Expected IPv4 address, got: %s", ipStr)
+		}
 	}
 }
